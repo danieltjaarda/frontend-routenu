@@ -5,7 +5,6 @@ Backend API server voor RouteNu route optimalisatie applicatie.
 ## Features
 
 - 📧 Email service via Resend
-- 💳 Stripe payment integration
 - 🗺️ Mapbox route optimization API
 - 🔄 Webhook handling
 
@@ -16,7 +15,6 @@ Zorg dat je de volgende environment variables instelt:
 ```
 PORT=8001
 RESEND_API_KEY=your_resend_api_key
-STRIPE_SECRET_KEY=your_stripe_secret_key
 MAPBOX_SECRET_TOKEN=your_mapbox_secret_token
 NODE_ENV=production
 ```
@@ -46,10 +44,6 @@ npm start
 
 ### Email
 - `POST /api/send-email` - Send email via Resend
-
-### Stripe
-- `POST /api/create-checkout-session` - Create Stripe checkout session
-- `GET /api/checkout-session/:sessionId` - Get checkout session details
 
 ### Route Optimization
 - `POST /api/optimize-route` - Optimize route using Mapbox Optimization API

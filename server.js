@@ -1,21 +1,15 @@
 const express = require('express');
 const cors = require('cors');
 const { Resend } = require('resend');
-const stripe = require('stripe');
 const https = require('https');
 const http = require('http');
 
 const app = express();
 const PORT = process.env.PORT || 8001;
 const RESEND_API_KEY = process.env.RESEND_API_KEY || 're_iDLLL1LU_NKoUQ1R5oReCnu4AJawE8Sy3';
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-if (!STRIPE_SECRET_KEY) {
-  console.warn('STRIPE_SECRET_KEY environment variable is not set');
-}
 const MAPBOX_SECRET_TOKEN = process.env.MAPBOX_SECRET_TOKEN || 'process.env.MAPBOX_SECRET_TOKEN || ""';
 
 const resend = new Resend(RESEND_API_KEY);
-const stripeClient = stripe(STRIPE_SECRET_KEY);
 
 // Middleware
 app.use(cors());
@@ -228,64 +222,6 @@ app.post('/api/send-webhook', async (req, res) => {
   }
 });
 
-// Stripe Checkout endpoint
-app.post('/api/create-checkout-session', async (req, res) => {
-  try {
-    const { priceId, quantity = 1, successUrl, cancelUrl } = req.body;
-
-    if (!priceId) {
-      return res.status(400).json({ 
-        error: 'Price ID is required' 
-      });
-    }
-
-    // Create Stripe Checkout Session
-    const session = await stripeClient.checkout.sessions.create({
-      mode: 'payment',
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price: priceId,
-          quantity: quantity,
-        },
-      ],
-      success_url: successUrl || `${req.headers.origin || 'http://localhost:8000'}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: cancelUrl || `${req.headers.origin || 'http://localhost:8000'}/checkout/cancel`,
-    });
-
-    res.json({ 
-      success: true, 
-      sessionId: session.id,
-      url: session.url 
-    });
-  } catch (error) {
-    console.error('Stripe checkout error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: error.message || 'Er is een fout opgetreden bij het aanmaken van de checkout sessie' 
-    });
-  }
-});
-
-// Get checkout session details
-app.get('/api/checkout-session/:sessionId', async (req, res) => {
-  try {
-    const { sessionId } = req.params;
-    
-    const session = await stripeClient.checkout.sessions.retrieve(sessionId);
-    
-    res.json({ 
-      success: true, 
-      session 
-    });
-  } catch (error) {
-    console.error('Stripe session retrieve error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: error.message || 'Er is een fout opgetreden bij het ophalen van de sessie' 
-    });
-  }
-});
 
 // Route optimization endpoint using Mapbox Optimization API
 app.post('/api/optimize-route', async (req, res) => {

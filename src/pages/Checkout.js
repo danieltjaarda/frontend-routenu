@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { loadStripe } from '@stripe/stripe-js';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import './Checkout.css';
-
-// Stripe public key
-const STRIPE_PUBLIC_KEY = 'pk_live_51Seb4zP8Cq9KeTGI4xIHz8FfKrFf7mzzsVdH3I7xP10hbgUgJwe04OgeC6gje8YpDrrRyaSO0K6Pvikz6H6u7FjR00WpEbz4ph';
 
 function Checkout() {
   const navigate = useNavigate();
@@ -31,9 +27,8 @@ function Checkout() {
       const response = await fetch(`http://localhost:8001/api/checkout-session/${sessionId}`);
       const data = await response.json();
       
-      if (data.success && data.session.payment_status === 'paid') {
-        // Payment successful
-        console.log('Payment successful:', data.session);
+      if (data.success) {
+        console.log('Session verified:', data.session);
       }
     } catch (error) {
       console.error('Error verifying session:', error);
@@ -42,56 +37,8 @@ function Checkout() {
 
   const handleCheckout = async (e) => {
     e.preventDefault();
-    
-    if (!priceId) {
-      setError('Voer een Price ID in');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Create checkout session
-      const response = await fetch('http://localhost:8001/api/create-checkout-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          priceId,
-          quantity,
-          successUrl: `${window.location.origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-          cancelUrl: `${window.location.origin}/checkout/cancel`,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error || 'Fout bij aanmaken checkout sessie');
-      }
-
-      // Initialize Stripe
-      const stripe = await loadStripe(STRIPE_PUBLIC_KEY);
-      
-      if (!stripe) {
-        throw new Error('Stripe kon niet worden geladen');
-      }
-
-      // Redirect to Stripe Checkout
-      const { error: redirectError } = await stripe.redirectToCheckout({
-        sessionId: data.sessionId,
-      });
-
-      if (redirectError) {
-        throw redirectError;
-      }
-    } catch (err) {
-      console.error('Checkout error:', err);
-      setError(err.message || 'Er is een fout opgetreden');
-      setLoading(false);
-    }
+    setError('Stripe checkout is niet beschikbaar');
+    setLoading(false);
   };
 
   if (isSuccess) {
