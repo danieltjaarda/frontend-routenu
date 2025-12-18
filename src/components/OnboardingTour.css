@@ -1,0 +1,151 @@
+.onboarding-tour-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.onboarding-tour-content {
+  background: white;
+  border-radius: 16px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.tour-header {
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.tour-progress {
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.tour-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #0CC0DF, #0AA5C0);
+  border-radius: 9999px;
+  transition: width 0.3s ease;
+}
+
+.tour-step-indicator {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+  text-align: center;
+}
+
+.tour-body {
+  padding: 24px;
+}
+
+.tour-title {
+  margin: 0 0 12px 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #333;
+}
+
+.tour-description {
+  margin: 0 0 16px 0;
+  font-size: 15px;
+  color: #666;
+  line-height: 1.6;
+}
+
+.tour-action {
+  margin: 0;
+  padding: 12px 16px;
+  background: #E0F7FA;
+  border-left: 4px solid #0CC0DF;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #0AA5C0;
+  font-weight: 500;
+}
+
+.tour-footer {
+  padding: 16px 24px 24px;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  border-top: 1px solid #e0e0e0;
+}
+
+.tour-btn-skip {
+  padding: 10px 20px;
+  background: transparent;
+  color: #666;
+  border: 1px solid #ddd;
+  border-radius: 9999px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tour-btn-skip:hover {
+  background: #f5f5f5;
+  border-color: #bbb;
+}
+
+.tour-btn-next {
+  padding: 10px 24px;
+  background: #0CC0DF;
+  color: white;
+  border: none;
+  border-radius: 9999px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.tour-btn-next:hover {
+  background: #0AA5C0;
+}
+
+
+
+
+
+
+
+
+
+
+

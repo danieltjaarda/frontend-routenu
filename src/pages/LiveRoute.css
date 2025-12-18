@@ -1,0 +1,256 @@
+.live-route-page {
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding: 24px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.live-route-header {
+  text-align: center;
+  margin-bottom: 32px;
+  background: white;
+  padding: 32px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.live-route-logo {
+  max-width: 150px;
+  margin-bottom: 16px;
+}
+
+.live-route-header h1 {
+  margin: 0 0 8px 0;
+  font-size: 28px;
+  color: #1976d2;
+}
+
+.route-name {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  margin: 8px 0;
+}
+
+.route-date {
+  color: #666;
+  margin: 4px 0;
+}
+
+.last-update {
+  font-size: 12px;
+  color: #999;
+  margin-top: 8px;
+}
+
+.live-route-status {
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 9999px;
+  font-weight: 500;
+  background: #E3F2FD;
+  color: #1976d2;
+}
+
+.status-badge.started {
+  background: #E8F5E9;
+  color: #2E7D32;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.route-start-info {
+  background: white;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.stops-list {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.stops-list h2 {
+  margin: 0 0 24px 0;
+  font-size: 24px;
+  color: #333;
+}
+
+.stops-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stop-card {
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 20px;
+  transition: all 0.2s;
+}
+
+.stop-card.completed {
+  border-color: #4CAF50;
+  background: #f1f8f4;
+}
+
+.stop-card.pending {
+  border-color: #FFC107;
+  background: #fffbf0;
+}
+
+.stop-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.stop-number {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #0CC0DF;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.stop-card.completed .stop-number {
+  background: #4CAF50;
+}
+
+.stop-info {
+  flex: 1;
+}
+
+.stop-info h3 {
+  margin: 0 0 4px 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.stop-address {
+  color: #666;
+  font-size: 14px;
+  margin: 0;
+}
+
+.stop-status {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #4CAF50;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stop-times {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.time-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.time-label {
+  font-weight: 500;
+  color: #666;
+}
+
+.time-value {
+  font-weight: 600;
+  color: #333;
+}
+
+.time-value.actual {
+  color: #4CAF50;
+}
+
+.time-value.estimated {
+  color: #FF9800;
+}
+
+.delay-info {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.delay-info.delay {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.delay-info.early {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.auto-refresh-note {
+  text-align: center;
+  margin-top: 24px;
+  color: #999;
+  font-size: 12px;
+}
+
+.loading-message,
+.error-message {
+  text-align: center;
+  padding: 60px 20px;
+  font-size: 18px;
+}
+
+.error-message {
+  color: #c62828;
+}
+
+
+
+
+
+
+
+
+
+
+

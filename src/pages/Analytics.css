@@ -1,0 +1,297 @@
+.analytics-page {
+  padding: 24px;
+  background: #f5f5f5;
+  min-height: 100vh;
+  width: 100%;
+  flex: 1;
+}
+
+.analytics-header {
+  margin-bottom: 32px;
+}
+
+.analytics-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.analytics-header h1 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #1976d2;
+}
+
+.analytics-header p {
+  margin: 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.analytics-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.period-filter-select {
+  padding: 0 16px;
+  border: 1px solid #ddd;
+  border-radius: 9999px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+  height: 40px;
+  line-height: 40px;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+  min-width: 160px;
+}
+
+.period-filter-select:focus {
+  outline: none;
+  border-color: #0CC0DF;
+}
+
+.date-filter-input {
+  padding: 0 16px;
+  border: 1px solid #ddd;
+  border-radius: 9999px;
+  font-size: 14px;
+  background: white;
+  height: 40px;
+  line-height: 40px;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+  min-width: 180px;
+  font-family: inherit;
+}
+
+.date-filter-input:focus {
+  outline: none;
+  border-color: #0CC0DF;
+}
+
+.date-filter-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.date-filter-input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+.analytics-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.summary-card {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s;
+}
+
+.summary-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.summary-card.highlight {
+  border-color: #0CC0DF;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f7fa 100%);
+}
+
+.summary-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.summary-value {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.summary-value.revenue {
+  color: #1976d2;
+}
+
+.summary-value.costs {
+  color: #F57C00;
+}
+
+.summary-value.profit {
+  color: #4CAF50;
+}
+
+.summary-value.loss {
+  color: #d32f2f;
+}
+
+.summary-period {
+  font-size: 11px;
+  color: #999;
+  font-weight: 500;
+}
+
+.analytics-content {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.empty-analytics {
+  text-align: center;
+  padding: 60px 20px;
+  color: #666;
+}
+
+.routes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 20px;
+}
+
+.route-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.route-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.route-card.selected {
+  border-color: #0CC0DF;
+  background: #f0f9ff;
+}
+
+.route-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.route-card-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.route-status {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.route-status.completed {
+  background: #d4edda;
+  color: #155724;
+}
+
+.route-card-body {
+  margin-bottom: 16px;
+}
+
+.route-card-body p {
+  margin: 8px 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.route-financials {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.route-financials p {
+  margin: 8px 0;
+}
+
+.cost-breakdown {
+  margin: 8px 0;
+}
+
+.cost-calculation {
+  margin-top: 4px;
+  padding-left: 12px;
+}
+
+.cost-calculation small {
+  color: #666;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.profit {
+  color: #4CAF50 !important;
+  font-weight: 600;
+}
+
+.stop-details-list {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.stop-details-list h4 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.stop-detail-item {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+.stop-detail-item p {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.work-description {
+  color: #333 !important;
+  font-style: italic;
+  margin: 8px 0 !important;
+}
+
+.stop-financials {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #666;
+}
+
+.loading-message {
+  text-align: center;
+  padding: 60px 20px;
+  font-size: 16px;
+  color: #666;
+}

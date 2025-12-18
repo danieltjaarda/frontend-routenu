@@ -1,0 +1,252 @@
+.app {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.content-wrapper {
+  display: flex;
+  flex: 1;
+  margin-left: 70px;
+  width: calc(100% - 70px);
+}
+
+.content-wrapper.full-width {
+  margin-left: 0;
+  width: 100%;
+}
+
+.content-wrapper > .map-container {
+  flex: 1;
+}
+
+.sidebar {
+  width: 400px;
+  background: #fff;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  overflow-y: auto;
+  z-index: 1;
+}
+
+.logo-container {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  max-width: 180px;
+  height: auto;
+  display: block;
+}
+
+.page-logo-footer {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 100;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.page-logo-footer:hover {
+  opacity: 1;
+}
+
+.page-logo-footer img {
+  max-width: 120px;
+  height: auto;
+  display: block;
+}
+
+.subtitle {
+  color: #666;
+  margin-bottom: 30px;
+  font-size: 14px;
+}
+
+/* Route Choice Modal */
+.route-choice-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.route-choice-content {
+  background: white;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.route-choice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.route-choice-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1976d2;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 32px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.close-button:hover {
+  background: #f5f5f5;
+  color: #333;
+}
+
+.route-choice-body {
+  padding: 24px;
+}
+
+.route-choice-body > p {
+  margin: 0 0 20px 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.existing-routes-list {
+  margin-bottom: 24px;
+}
+
+.existing-routes-list h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.route-choice-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.route-choice-button:hover {
+  border-color: #0CC0DF;
+  background: #E0F7FA;
+}
+
+.route-number {
+  width: 32px;
+  height: 32px;
+  background: #0CC0DF;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.route-info {
+  flex: 1;
+  text-align: left;
+}
+
+.route-info .route-name {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.route-info .route-details {
+  font-size: 13px;
+  color: #666;
+}
+
+.route-choice-actions {
+  padding-top: 20px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.btn-new-route-choice {
+  width: 100%;
+  padding: 14px 20px;
+  background: #0CC0DF;
+  color: white;
+  border: none;
+  border-radius: 9999px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.2s;
+}
+
+.btn-new-route-choice:hover {
+  background: #0AA5C0;
+}
+
+.btn-new-route-choice .plus-icon {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.map-container {
+  position: relative;
+}
+
+@media (max-width: 768px) {
+  .content-wrapper {
+    margin-left: 0;
+    width: 100%;
+    flex-direction: column;
+  }
+  
+  .sidebar {
+    width: 100%;
+    max-height: 40vh;
+  }
+  
+  .map-container {
+    height: 60vh;
+  }
+}
+

@@ -1,0 +1,11 @@
+.onboarding-page {
+  min-height: 100vh;
+  width: 100vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0CC0DF 0%, #0AA5C0 100%);
+  padding: 20px;
+  position: relative;
+}
+
