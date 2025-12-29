@@ -16,7 +16,6 @@ import EmailConfigurator from './pages/EmailConfigurator';
 import LiveRoute from './pages/LiveRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Onboarding from './pages/Onboarding';
 import Profile from './pages/Profile';
 import DriverLogin from './pages/DriverLogin';
 import DriverDashboard from './pages/DriverDashboard';
@@ -44,55 +43,6 @@ const MAPBOX_SECRET_TOKEN = 'process.env.MAPBOX_SECRET_TOKEN || ""';
 const MAPBOX_PUBLIC_TOKEN = process.env.REACT_APP_MAPBOX_PUBLIC_TOKEN || 'pk.eyJ1IjoiZmF0YmlrZWh1bHAiLCJhIjoiY21qNnhmanp5MDB4ajNncjB1YXJrMDc2cSJ9.5CYl4ZfCROi-pmyaNzETIg';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8001');
-
-// Helper function to normalize coordinates to [lng, lat] format
-// Mapbox expects [longitude, latitude] format
-const normalizeCoordinates = (coords) => {
-  if (!coords || !Array.isArray(coords) || coords.length !== 2) {
-    return coords;
-  }
-  
-  const [first, second] = coords;
-  
-  // Validate that both are numbers
-  if (typeof first !== 'number' || typeof second !== 'number') {
-    console.warn('Coordinates are not numbers:', coords);
-    return coords;
-  }
-  
-  // Check if coordinates are in wrong order (lat, lng instead of lng, lat)
-  // For Netherlands: longitude is between ~3-7, latitude is between ~50-54
-  // If first value is between 50-54 (latitude range) and second is between 3-7 (longitude range),
-  // then they are in wrong order
-  const isFirstLatitude = first >= 50 && first <= 54;
-  const isSecondLongitude = second >= 3 && second <= 7;
-  
-  // Also check if first is clearly latitude (> 10) and second is clearly longitude (< 10)
-  const isFirstClearlyLat = Math.abs(first) > 10 && Math.abs(first) < 90;
-  const isSecondClearlyLng = Math.abs(second) >= 3 && Math.abs(second) <= 7;
-  
-  if ((isFirstLatitude && isSecondLongitude) || (isFirstClearlyLat && isSecondClearlyLng)) {
-    console.warn('Coordinates appear to be in wrong order (lat, lng), swapping to (lng, lat):', coords, '->', [second, first]);
-    return [second, first];
-  }
-  
-  // Also check reverse: if first is longitude and second is latitude, they're already correct
-  const isFirstLongitude = first >= 3 && first <= 7;
-  const isSecondLatitude = second >= 50 && second <= 54;
-  
-  if (isFirstLongitude && isSecondLatitude) {
-    // Already in correct order [lng, lat]
-    return coords;
-  }
-  
-  // If we can't determine, return as-is (might be outside Netherlands or already correct)
-  // But log a warning if values seem suspicious
-  if (Math.abs(first) > 90 || Math.abs(second) > 180) {
-    console.warn('Coordinates have suspicious values (outside normal ranges):', coords);
-  }
-  
-  return coords;
-};
 
 function AppContent() {
   const navigate = useNavigate();
@@ -124,8 +74,8 @@ function AppContent() {
     // Only redirect once on initial load/refresh
     if (hasRedirectedRef.current || !currentUser || isDriver) return;
     
-    // Don't redirect on auth pages, checkout, profile pages, onboarding, or if already on /vandaag
-    const excludedPages = ['/login', '/register', '/chauffeur-login', '/checkout', '/checkout/success', '/checkout/cancel', '/profiel', '/vandaag', '/route-aanmaken', '/onboarding', '/on-boarding'];
+    // Don't redirect on auth pages, checkout, profile pages, or if already on /vandaag
+    const excludedPages = ['/login', '/register', '/chauffeur-login', '/checkout', '/checkout/success', '/checkout/cancel', '/profiel', '/vandaag', '/route-aanmaken'];
     if (excludedPages.includes(location.pathname)) {
       hasRedirectedRef.current = true;
       return;
@@ -175,8 +125,8 @@ function AppContent() {
     const checkSetupRequirements = async () => {
       if (!currentUser || isDriver) return;
       
-      // Don't check on auth pages, profile page, checkout, setup pages, onboarding, or /vandaag
-      const allowedPages = ['/login', '/register', '/profiel', '/checkout', '/chauffeurs', '/voertuigen', '/chauffeurs-lijst', '/vandaag', '/onboarding', '/on-boarding'];
+      // Don't check on auth pages, profile page, checkout, setup pages, or /vandaag
+      const allowedPages = ['/login', '/register', '/profiel', '/checkout', '/chauffeurs', '/voertuigen', '/chauffeurs-lijst', '/vandaag'];
       if (allowedPages.includes(location.pathname)) {
         return;
       }
@@ -284,28 +234,20 @@ function AppContent() {
         setUserProfile(profile);
         
         // Map database field names to form field names for vehicles
-        const mappedVehicles = userVehicles.map(vehicle => {
-          // Find driver name by driver ID
-          const driverId = vehicle.driver || vehicle.chauffeur;
-          const driver = userDrivers?.find(d => d.id === driverId);
-          const driverName = driver?.name || driverId || '-';
-          
-          return {
-            ...vehicle,
-            // Map database fields to form fields for backward compatibility
-            kenteken: vehicle.license_plate || vehicle.kenteken,
-            omschrijving: vehicle.description || vehicle.omschrijving,
-            vasteKleur: vehicle.fixed_color || vehicle.vasteKleur,
-            brandstofType: vehicle.fuel_type || vehicle.brandstofType,
-            verbruik: vehicle.consumption || vehicle.verbruik,
-            co2Uitstoot: vehicle.co2_emission || vehicle.co2Uitstoot,
-            chauffeur: driverName, // Use driver name for display
-            driver: driverId, // Keep driver ID for form editing
-            starttijd: vehicle.start_time || vehicle.starttijd,
-            eindtijd: vehicle.end_time || vehicle.eindtijd,
-            snelheid: vehicle.speed || vehicle.snelheid
-          };
-        });
+        const mappedVehicles = userVehicles.map(vehicle => ({
+          ...vehicle,
+          // Map database fields to form fields for backward compatibility
+          kenteken: vehicle.license_plate || vehicle.kenteken,
+          omschrijving: vehicle.description || vehicle.omschrijving,
+          vasteKleur: vehicle.fixed_color || vehicle.vasteKleur,
+          brandstofType: vehicle.fuel_type || vehicle.brandstofType,
+          verbruik: vehicle.consumption || vehicle.verbruik,
+          co2Uitstoot: vehicle.co2_emission || vehicle.co2Uitstoot,
+          chauffeur: vehicle.driver || vehicle.chauffeur, // Important for driver selection
+          starttijd: vehicle.start_time || vehicle.starttijd,
+          eindtijd: vehicle.end_time || vehicle.eindtijd,
+          snelheid: vehicle.speed || vehicle.snelheid
+        }));
         
         // Map database field names to frontend format for orders
         const mappedOrders = userOrders.map(order => ({
@@ -363,10 +305,10 @@ function AppContent() {
               year: 'numeric' 
             })
           : 'vandaag';
-        const routeLink = routeId ? `https://routenu.nl/route/${routeId}` : '#';
+        const routeLink = routeId ? `https://app.routenu.nl/route/${routeId}` : '#';
         
         savedTemplate = {
-          subject: `Welkom bij RouteNu - U bent toegevoegd aan route ${routeNameForTemplate}`,
+          subject: `Welkom bij RouteNu - U bent toegevoegd aan route \${routeName}`,
           html_content: `<!DOCTYPE html>
 <html>
 <head>
@@ -411,22 +353,54 @@ function AppContent() {
 </head>
 <body>
   <div class="header">
-    <h1>RouteNu</h1>
+    <h1>Routenu.nl</h1>
   </div>
   <div class="content">
-    <h2>Beste ${stop.name || 'klant'},</h2>
-    <p>De route <strong>${routeNameForTemplate}</strong> is aangemaakt en u bent aangemeld voor deze route op <strong>${routeDateForTemplate}</strong>.</p>
+    <h2>Beste \${stopName},</h2>
+    <p>De route <strong>\${routeName}</strong> is aangemaakt en u bent aangemeld voor deze route op <strong>\${routeDate}</strong>.</p>
     <div class="info-box">
       <p><strong>Uw stop:</strong></p>
-      <p>${stop.address || 'Adres wordt binnenkort toegevoegd'}</p>
+      <p>\${stopAddress}</p>
     </div>
     <p>U ontvangt verdere informatie zodra de route is berekend en geoptimaliseerd.</p>
-    <a href="${routeLink}" class="button">Bekijk route</a>
+    <a href="\${liveRouteLink}" class="button">Bekijk route</a>
   </div>
 </body>
 </html>`,
           from_email: 'noreply@routenu.nl'
         };
+      }
+
+      // Haal of genereer token voor deze route
+      let liveRouteToken = null;
+      if (routeId) {
+        try {
+          const { supabase } = await import('./lib/supabase');
+          // Check of route al een token heeft
+          const { data: routeData } = await supabase
+            .from('routes')
+            .select('live_route_token')
+            .eq('id', routeId)
+            .eq('user_id', currentUser.id)
+            .maybeSingle();
+          
+          if (routeData?.live_route_token) {
+            liveRouteToken = routeData.live_route_token;
+          } else {
+            // Genereer nieuwe token en sla op
+            liveRouteToken = `${routeId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+            await supabase
+              .from('routes')
+              .update({ live_route_token: liveRouteToken })
+              .eq('id', routeId)
+              .eq('user_id', currentUser.id);
+            console.log('✓ Generated and saved new live_route_token for route:', routeId);
+          }
+        } catch (error) {
+          console.error('Error getting/generating token:', error);
+          // Genereer token lokaal als fallback (wordt niet opgeslagen)
+          liveRouteToken = `${routeId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        }
       }
 
       // Vervang template variabelen
@@ -438,42 +412,69 @@ function AppContent() {
             year: 'numeric' 
           })
         : 'vandaag';
-      const routeLink = routeId ? `https://routenu.nl/route/${routeId}` : '#';
+      
+      // Genereer persoonlijke link met token en email
+      const encodedEmail = stop.email ? encodeURIComponent(stop.email.trim().toLowerCase()) : '';
+      const liveRouteLink = routeId && liveRouteToken && encodedEmail 
+        ? `https://app.routenu.nl/route/${routeId}/${liveRouteToken}/${encodedEmail}`
+        : routeId 
+        ? `https://app.routenu.nl/route/${routeId}`
+        : '#';
+      const routeLink = liveRouteLink; // Use same link for backwards compatibility
       
       let htmlContent = savedTemplate.html_content
         .replace(/\$\{stopName\}/g, stop.name || 'klant')
         .replace(/\$\{stopAddress\}/g, stop.address || 'Adres wordt binnenkort toegevoegd')
         .replace(/\$\{routeName\}/g, routeNameForTemplate)
         .replace(/\$\{routeDate\}/g, routeDateForTemplate)
-        .replace(/\$\{routeLink\}/g, routeLink);
+        .replace(/\$\{liveRouteLink\}/g, liveRouteLink)
+        .replace(/\$\{routeLink\}/g, routeLink); // Backwards compatibility
 
       let subject = savedTemplate.subject
         .replace(/\$\{stopName\}/g, stop.name || 'klant')
         .replace(/\$\{stopAddress\}/g, stop.address || 'Adres wordt binnenkort toegevoegd')
         .replace(/\$\{routeName\}/g, routeNameForTemplate)
         .replace(/\$\{routeDate\}/g, routeDateForTemplate)
-        .replace(/\$\{routeLink\}/g, routeLink);
+        .replace(/\$\{liveRouteLink\}/g, liveRouteLink)
+        .replace(/\$\{routeLink\}/g, routeLink); // Backwards compatibility
 
       // Verstuur e-mail
-      const response = await fetch(`${API_BASE_URL}/api/send-email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          from: savedTemplate.from_email || 'noreply@routenu.nl',
-          to: stop.email.trim(),
-          subject: subject,
-          html: htmlContent
-        })
-      });
+      let emailSent = false;
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/send-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: savedTemplate.from_email || 'noreply@routenu.nl',
+            to: stop.email.trim(),
+            subject: subject,
+            html: htmlContent
+          })
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error sending welcome email:', errorData);
-      } else {
-        // Verstuur webhook als e-mail succesvol is verzonden en webhook URL bestaat
-        if (savedTemplate.webhook_url) {
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Error sending welcome email:', errorData);
+        } else {
+          emailSent = true;
+          console.log('✅ Welcome email sent successfully');
+        }
+      } catch (emailError) {
+        console.error('Error sending welcome email:', emailError);
+      }
+
+      // Verstuur webhook ALTIJD (ook als e-mail faalt) als webhook URL bestaat
+      if (savedTemplate.webhook_url && savedTemplate.webhook_url.trim()) {
+        console.log('🚀 Sending webhook for klant-aangemeld:', {
+          webhookUrl: savedTemplate.webhook_url,
+          hasWebhookUrl: !!savedTemplate.webhook_url,
+          webhookUrlLength: savedTemplate.webhook_url.length,
+          emailSent: emailSent
+        });
+        
+        try {
           await sendWebhook(savedTemplate.webhook_url, 'klant-aangemeld', {
             stopName: stop.name || '',
             name: stop.name || '',
@@ -485,7 +486,16 @@ function AppContent() {
             routeDate: routeDateForTemplate,
             routeLink: routeLink
           });
+          console.log('✅ Webhook sent successfully for klant-aangemeld');
+        } catch (webhookError) {
+          console.error('❌ Error sending webhook:', webhookError);
         }
+      } else {
+        console.log('⚠️ No webhook URL configured for klant-aangemeld template:', {
+          hasSavedTemplate: !!savedTemplate,
+          webhookUrl: savedTemplate?.webhook_url,
+          webhookUrlType: typeof savedTemplate?.webhook_url
+        });
       }
     } catch (error) {
       console.error('Error sending welcome email:', error);
@@ -665,116 +675,36 @@ function AppContent() {
       // Get startpoint from user profile or use first stop
       let startCoordinates = null;
       if (userProfile?.start_coordinates) {
-        startCoordinates = normalizeCoordinates(userProfile.start_coordinates);
-      } else if (stops.length > 0 && stops[0].coordinates) {
-        startCoordinates = normalizeCoordinates(stops[0].coordinates);
+        startCoordinates = userProfile.start_coordinates;
+      } else if (stops.length > 0) {
+        startCoordinates = stops[0].coordinates;
       } else {
         alert('Geen startpunt gevonden. Stel een startpunt in via Instellingen.');
         setIsOptimizing(false);
         return;
       }
 
-      // Validate that startCoordinates is valid
-      if (!startCoordinates || !Array.isArray(startCoordinates) || startCoordinates.length !== 2) {
-        alert('Startpunt heeft geen geldige coördinaten. Stel een startpunt in via Instellingen.');
-        setIsOptimizing(false);
-        return;
-      }
-
-      // Validate that all stops have valid coordinates and normalize them
-      const normalizedStops = stops.map(stop => ({
-        ...stop,
-        coordinates: stop.coordinates ? normalizeCoordinates(stop.coordinates) : stop.coordinates
-      }));
-
-      const stopsWithInvalidCoordinates = normalizedStops.filter(stop => 
-        !stop.coordinates || 
-        !Array.isArray(stop.coordinates) || 
-        stop.coordinates.length !== 2 ||
-        typeof stop.coordinates[0] !== 'number' ||
-        typeof stop.coordinates[1] !== 'number'
-      );
-
-      if (stopsWithInvalidCoordinates.length > 0) {
-        console.error('Stops with invalid coordinates:', stopsWithInvalidCoordinates);
-        alert(`Er zijn ${stopsWithInvalidCoordinates.length} stop(s) zonder geldige coördinaten. Controleer de stops en voeg coördinaten toe.`);
-        setIsOptimizing(false);
-        return;
-      }
-
       // Format: startpoint;stop1;stop2;...;startpoint (startpoint first, then stops, then back to start)
-      const stopCoordinates = normalizedStops
-        .filter(stop => stop.coordinates && Array.isArray(stop.coordinates) && stop.coordinates.length === 2)
-        .map(stop => `${stop.coordinates[0]},${stop.coordinates[1]}`)
-        .join(';');
-      
-      if (!stopCoordinates) {
-        alert('Geen geldige stops gevonden met coördinaten.');
-        setIsOptimizing(false);
-        return;
-      }
-
+      const stopCoordinates = stops.map(stop => `${stop.coordinates[0]},${stop.coordinates[1]}`).join(';');
       const coordinates = `${startCoordinates[0]},${startCoordinates[1]};${stopCoordinates};${startCoordinates[0]},${startCoordinates[1]}`;
-      
-      // Log detailed coordinate information for debugging
-      console.log('Calling Mapbox API with coordinates:', {
-        coordinatesLength: coordinates.length,
-        stopsCount: normalizedStops.length,
-        startCoordinates,
-        hasStopCoordinates: !!stopCoordinates,
-        fullCoordinatesString: coordinates,
-        allStopCoordinates: normalizedStops.map((stop, idx) => ({
-          index: idx,
-          name: stop.name,
-          coordinates: stop.coordinates,
-          formatted: stop.coordinates ? `${stop.coordinates[0]},${stop.coordinates[1]}` : 'MISSING'
-        }))
-      });
       
       // Gebruik Directions API met public token (werkt vanuit browser)
       // Voor meerdere stops gebruiken we waypoints
-      // Note: Mapbox expects coordinates in URL path, not URL encoded
-      const apiUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?` +
+      const response = await fetch(
+        `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?` +
         `access_token=${MAPBOX_PUBLIC_TOKEN}&` +
         `geometries=geojson&` +
         `overview=full&` +
         `steps=true&` +
-        `annotations=duration,distance`;
-      
-      console.log('Mapbox API URL (first 300 chars):', apiUrl.substring(0, 300));
-      
-      const response = await fetch(apiUrl);
+        `annotations=duration,distance`
+      );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('Mapbox API error:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorData
-        });
-        throw new Error(errorData.message || `Route berekening mislukt (${response.status})`);
+        throw new Error(errorData.message || 'Route berekening mislukt');
       }
 
       const data = await response.json();
-      
-      console.log('Mapbox API response:', {
-        code: data.code,
-        hasRoutes: !!data.routes,
-        routesLength: data.routes?.length,
-        message: data.message,
-        fullResponse: data // Log full response for debugging
-      });
-      
-      // If NoRoute, log more details
-      if (data.code === 'NoRoute') {
-        console.error('Mapbox NoRoute error details:', {
-          code: data.code,
-          message: data.message,
-          waypoints: data.waypoints,
-          coordinates: coordinates,
-          stops: stops.map(s => ({ name: s.name, coords: s.coordinates }))
-        });
-      }
       
       // Directions API response
       if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
@@ -801,12 +731,7 @@ function AppContent() {
           console.error('Error auto-saving route:', err);
         });
       } else {
-        console.error('Mapbox API returned no route:', {
-          code: data.code,
-          message: data.message,
-          data: data
-        });
-        throw new Error(data.message || 'Geen route gevonden. Controleer of alle stops geldige coördinaten hebben.');
+        throw new Error(data.message || 'Geen route gevonden');
       }
     } catch (error) {
       console.error('Route berekening error:', error);
@@ -825,470 +750,124 @@ function AppContent() {
     setIsOptimizing(true);
     try {
       // Get startpoint from user profile or use first stop
-      let startCoordinates = null;
+      let startCoords = null;
       if (userProfile?.start_coordinates) {
-        startCoordinates = normalizeCoordinates(userProfile.start_coordinates);
-      } else if (stops.length > 0 && stops[0].coordinates) {
-        startCoordinates = normalizeCoordinates(stops[0].coordinates);
+        startCoords = userProfile.start_coordinates;
+      } else if (stops.length > 0) {
+        startCoords = stops[0].coordinates;
       } else {
         alert('Geen startpunt gevonden. Stel een startpunt in via Instellingen.');
         setIsOptimizing(false);
         return;
       }
 
-      // Validate that startCoordinates is valid
-      if (!startCoordinates || !Array.isArray(startCoordinates) || startCoordinates.length !== 2) {
-        alert('Startpunt heeft geen geldige coördinaten. Stel een startpunt in via Instellingen.');
+      // Build waypoints array: startpoint + all stops
+      // Note: We don't add endpoint as Mapbox Optimization API handles roundtrip=true
+      const waypoints = [
+        { coordinates: startCoords },
+        ...stops.map(stop => ({ coordinates: stop.coordinates }))
+      ];
+
+      // Check maximum waypoints limit (Mapbox Optimization API supports max 12)
+      if (waypoints.length > 12) {
+        alert(`Maximum 12 waypoints ondersteund voor optimalisatie. Je hebt ${waypoints.length} waypoints (inclusief startpunt). Verwijder ${waypoints.length - 12} stops.`);
         setIsOptimizing(false);
         return;
       }
 
-      // Validate that all stops have valid coordinates and normalize them
-      const normalizedStops = stops.map(stop => ({
-        ...stop,
-        coordinates: stop.coordinates ? normalizeCoordinates(stop.coordinates) : stop.coordinates
-      }));
-
-      const stopsWithInvalidCoordinates = normalizedStops.filter(stop => 
-        !stop.coordinates || 
-        !Array.isArray(stop.coordinates) || 
-        stop.coordinates.length !== 2 ||
-        typeof stop.coordinates[0] !== 'number' ||
-        typeof stop.coordinates[1] !== 'number'
-      );
-
-      if (stopsWithInvalidCoordinates.length > 0) {
-        console.error('Stops with invalid coordinates:', stopsWithInvalidCoordinates);
-        alert(`Er zijn ${stopsWithInvalidCoordinates.length} stop(s) zonder geldige coördinaten. Controleer de stops en voeg coördinaten toe.`);
-        setIsOptimizing(false);
-        return;
-      }
-
-      // Check if we have too many waypoints (Optimization API limit is 12)
-      const validStops = normalizedStops.filter(stop => 
-        stop.coordinates && Array.isArray(stop.coordinates) && stop.coordinates.length === 2
-      );
+      console.log('Calling optimize-route API with waypoints:', waypoints.length);
       
-      if (validStops.length === 0) {
-        alert('Geen geldige stops gevonden met coördinaten.');
-        setIsOptimizing(false);
-        return;
-      }
-
-      if (validStops.length > 11) {
-        alert(`Te veel stops voor route optimalisatie. Maximum is 11 stops (je hebt ${validStops.length}).`);
-        setIsOptimizing(false);
-        return;
-      }
-
-      // Use Mapbox Optimization API to optimize the route order
-      // This requires a secret token and will optimize the order of stops
-      const waypoints = validStops.map(stop => ({
-        coordinates: stop.coordinates
-      }));
-
-      // Optimization API request body
-      // For roundtrip=true, we only need to send the start point ONCE
-      // The API will automatically return to the start point
-      // We set source=first to keep the start fixed, and let the API optimize the order of stops
-      const optimizationRequest = {
-        profile: 'driving',
-        waypoints: [
-          {
-            coordinates: startCoordinates,
-            approach: 'curb'
-          },
-          ...waypoints.map(wp => ({
-            coordinates: wp.coordinates,
-            approach: 'curb'
-          }))
-          // DO NOT add start coordinates again at the end - roundtrip handles the return automatically
-        ],
-        roundtrip: true,  // Automatically returns to start
-        source: 'first',  // Keep start point fixed at position 0
-        // destination: leave as 'any' (default) so API can choose best last stop before returning
-        geometries: 'geojson',
-        overview: 'full',
-        steps: true,
-        annotations: ['duration', 'distance']
-      };
-
-      console.log('Calling Mapbox Optimization API:', {
-        waypointsCount: optimizationRequest.waypoints.length,
-        stopsCount: validStops.length,
-        startCoordinates,
-        stopsOrder: validStops.map(s => s.name)
+      // Call server-side optimization endpoint that uses Mapbox Optimization API
+      const response = await fetch(`${API_BASE_URL}/optimize-route`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          waypoints,
+          profile: 'driving'
+        })
       });
 
-      // Call Optimization API (requires secret token, must be done server-side)
-      // Since we can't use secret token in browser, we'll use a backend endpoint
-      // For now, let's use the backend API if available, otherwise fall back to Directions API
-      const API_BASE_URL = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8001');
-      
-      let response;
-      let data;
-      
-      try {
-        // Try to use backend API for optimization (if available)
-        const optimizeUrl = API_BASE_URL.startsWith('http') 
-          ? `${API_BASE_URL}/api/optimize-route`
-          : `${API_BASE_URL}/optimize-route`;
-        
-        console.log('Calling backend optimization endpoint:', optimizeUrl);
-        
-        response = await fetch(optimizeUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            waypoints: optimizationRequest.waypoints,
-            profile: optimizationRequest.profile
-          })
-        });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.message || 'Route optimalisatie mislukt');
+      }
 
-        if (response.ok) {
-          data = await response.json();
-        } else {
-          throw new Error('Backend optimization not available');
-        }
-      } catch (backendError) {
-        console.log('Backend optimization not available, using client-side optimization fallback');
-        
-        // Fallback: Use Directions API with all permutations or a simple optimization
-        // For now, we'll calculate the route and let Mapbox handle basic optimization
-        // by trying different orderings
-        const allWaypoints = validStops.map(stop => stop.coordinates);
-        const startCoord = startCoordinates;
-        
-        // Try to optimize by calculating distance matrix and finding best order
-        // For simplicity, we'll use a greedy nearest-neighbor approach
-        const optimizedOrder = [startCoord];
-        const remaining = [...allWaypoints];
-        let current = startCoord;
-        
-        while (remaining.length > 0) {
-          let nearest = null;
-          let nearestIndex = -1;
-          let minDistance = Infinity;
-          
-          // Find nearest unvisited waypoint
-          for (let i = 0; i < remaining.length; i++) {
-            const distance = Math.sqrt(
-              Math.pow(current[0] - remaining[i][0], 2) + 
-              Math.pow(current[1] - remaining[i][1], 2)
-            );
-            if (distance < minDistance) {
-              minDistance = distance;
-              nearest = remaining[i];
-              nearestIndex = i;
-            }
-          }
-          
-          if (nearest) {
-            optimizedOrder.push(nearest);
-            remaining.splice(nearestIndex, 1);
-            current = nearest;
-          }
-        }
-        
-        // Add return to start
-        optimizedOrder.push(startCoord);
-        
-        // Calculate route with optimized order
-        const coordinates = optimizedOrder.map(coord => `${coord[0]},${coord[1]}`).join(';');
-        
-        const apiUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?` +
-          `access_token=${MAPBOX_PUBLIC_TOKEN}&` +
-          `geometries=geojson&` +
-          `overview=full&` +
-          `steps=true&` +
-          `annotations=duration,distance`;
-        
-        console.log('Using optimized order (nearest-neighbor):', coordinates);
-        
-        response = await fetch(apiUrl);
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || `Route optimalisatie mislukt (${response.status})`);
-        }
-        
-        data = await response.json();
-        
-        // If NoRoute with optimized order, try calculating in segments
-        if (data.code === 'NoRoute' && optimizedOrder.length > 4) {
-          console.log('Optimized route failed, trying segments approach...');
-          
-          try {
-            const segmentSize = 2;
-            const segments = [];
-            const segmentWaypoints = optimizedOrder.slice(1, -1); // Remove start and end
-            
-            for (let i = 0; i < segmentWaypoints.length; i += segmentSize) {
-              const segmentPoints = segmentWaypoints.slice(i, i + segmentSize);
-              const segmentStart = i === 0 ? optimizedOrder[0] : segmentWaypoints[i - 1];
-              const segmentEnd = i + segmentSize >= segmentWaypoints.length 
-                ? optimizedOrder[optimizedOrder.length - 1] 
-                : segmentWaypoints[i + segmentSize];
-              
-              const segmentCoords = `${segmentStart[0]},${segmentStart[1]};${segmentPoints.map(p => `${p[0]},${p[1]}`).join(';')};${segmentEnd[0]},${segmentEnd[1]}`;
-              
-              const segmentUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${segmentCoords}?` +
-                `access_token=${MAPBOX_PUBLIC_TOKEN}&` +
-                `geometries=geojson&` +
-                `overview=full`;
-              
-              const segmentResponse = await fetch(segmentUrl);
-              const segmentData = await segmentResponse.json();
-              
-              if (segmentData.code === 'Ok' && segmentData.routes && segmentData.routes.length > 0) {
-                segments.push(segmentData.routes[0]);
-              } else {
-                console.error(`Segment ${i} failed:`, segmentData);
-                throw new Error('Route segment calculation failed');
-              }
-            }
-            
-            // Combine segments
-            const combinedCoordinates = [];
-            let totalDistance = 0;
-            let totalDuration = 0;
-            
-            segments.forEach((segment, idx) => {
-              if (segment.geometry && segment.geometry.coordinates) {
-                if (idx === 0) {
-                  combinedCoordinates.push(...segment.geometry.coordinates);
-                } else {
-                  combinedCoordinates.push(...segment.geometry.coordinates.slice(1));
-                }
-                totalDistance += segment.distance || 0;
-                totalDuration += segment.duration || 0;
-              }
-            });
-            
-            if (combinedCoordinates.length > 0) {
-              data = {
-                code: 'Ok',
-                routes: [{
-                  geometry: {
-                    type: 'LineString',
-                    coordinates: combinedCoordinates
-                  },
-                  distance: totalDistance,
-                  duration: totalDuration
-                }],
-                waypoints: []
-              };
-              console.log('Route calculated from segments successfully');
-            }
-          } catch (segmentError) {
-            console.error('Error calculating route in segments:', segmentError);
-            // Fall through to show original error
-          }
-        }
-      }
+      const data = await response.json();
       
-      console.log('Mapbox API response:', {
-        code: data.code,
-        hasRoutes: !!data.routes,
-        routesLength: data.routes?.length,
-        message: data.message
-      });
-      
-      // If NoRoute, log more details
-      if (data.code === 'NoRoute') {
-        console.error('Mapbox NoRoute error details:', {
-          code: data.code,
-          message: data.message,
-          waypoints: data.waypoints
-        });
-        throw new Error(data.message || 'Geen route gevonden. Controleer of alle stops geldige coördinaten hebben.');
-      }
-      
-      // Process successful route response
+      // Optimization API response (converted to Directions format by server)
       if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
         const routeData = data.routes[0];
         
-        // If we have waypoints from the response, reorder stops to match optimized order
-        let optimizedStops = [...stops];
-        let stopsReordered = false;
+        // IMPORTANT: Reorder stops based on optimized waypoint_index
+        // The waypoints array contains: [startpoint, stop1, stop2, ...]
+        // waypoint_index tells us the optimized order
+        // Skip waypoint index 0 (startpoint) and handle roundtrip endpoint
+        const optimizedWaypoints = data.waypoints || [];
         
-        if (data.waypoints && data.waypoints.length > 0) {
-          console.log('Waypoints from optimization API:', data.waypoints);
-          console.log('Valid stops:', validStops.map(s => ({ name: s.name, coords: s.coordinates })));
-          
-          // IMPORTANT: According to Mapbox docs, waypoints array is in INPUT order (original order)
-          // But waypoint_index gives the OPTIMIZED order within the trip
-          // Since we now send [start, stop1, stop2, ...] (no duplicate start at end),
-          // waypoint[0] = start (waypoint_index = 0)
-          // waypoint[1..n] = stops (waypoint_index = optimized position)
-          
-          console.log('All waypoints from API:', data.waypoints.map(wp => ({
-            location: wp.location,
-            waypoint_index: wp.waypoint_index,
-            trips_index: wp.trips_index
-          })));
-          
-          // Skip the first waypoint (index 0 = start point)
-          const stopWaypoints = data.waypoints.slice(1);
-          
-          console.log('Stop waypoints (excluding start at index 0):', stopWaypoints.map(wp => ({
-            location: wp.location,
-            waypoint_index: wp.waypoint_index
-          })));
-          
-          // Create mapping: waypoint -> stop by matching coordinates
-          // Keep track of which stops have been matched to handle duplicates
-          const usedStopIndices = new Set();
-          
-          const stopMappings = stopWaypoints.map((wp) => {
-            const wpCoords = wp.location || wp.coordinates || (Array.isArray(wp) ? wp : null);
-            
-            if (!wpCoords || !Array.isArray(wpCoords)) {
-              console.warn('Invalid waypoint coordinates:', wp);
-              return null;
-            }
-            
-            // Find matching stop by coordinates (with tolerance)
-            // For duplicates, find the first unmatched stop
-            let stopIndex = -1;
-            for (let i = 0; i < validStops.length; i++) {
-              // Skip already matched stops (for handling duplicates)
-              if (usedStopIndices.has(i)) continue;
-              
-              const stop = validStops[i];
-              const stopCoords = stop.coordinates;
-              if (!stopCoords || !Array.isArray(stopCoords)) continue;
-              
-              // Check if coordinates match (within 0.01 degrees tolerance, ~1km)
-              // Increased tolerance to handle slight coordinate differences
-              const lngDiff = Math.abs(stopCoords[0] - wpCoords[0]);
-              const latDiff = Math.abs(stopCoords[1] - wpCoords[1]);
-              
-              if (lngDiff < 0.01 && latDiff < 0.01) {
-                stopIndex = i;
-                usedStopIndices.add(i); // Mark as matched
-                break;
-              }
-            }
-            
-            if (stopIndex === -1) {
-              console.warn(`Could not match waypoint to stop:`, {
-                wpCoords,
-                waypoint_index: wp.waypoint_index,
-                availableStops: validStops.filter((_, idx) => !usedStopIndices.has(idx)).map(s => ({
-                  name: s.name,
-                  coords: s.coordinates
-                }))
-              });
-            }
-            
-            return {
-              waypoint: wp,
-              waypoint_index: wp.waypoint_index !== undefined ? wp.waypoint_index : -1,
-              stopIndex: stopIndex,
-              coords: wpCoords
-            };
-          }).filter(mapping => mapping !== null && mapping.stopIndex !== -1);
-          
-          // Sort by waypoint_index to get optimized order
-          // waypoint_index represents the position in the optimized trip
-          stopMappings.sort((a, b) => a.waypoint_index - b.waypoint_index);
-          
-          console.log('Stop mappings sorted by waypoint_index (optimized order):', 
-            stopMappings.map(m => ({
-              stopIndex: m.stopIndex,
-              stopName: validStops[m.stopIndex]?.name,
-              waypoint_index: m.waypoint_index
-            })));
-          
-          // Reorder stops based on optimized waypoint order
-          // If we matched all stops, use the optimized order
-          // If we didn't match all, try using waypoint_index as fallback
-          if (stopMappings.length === validStops.length) {
-            // Create new stops array in optimized order
-            optimizedStops = stopMappings.map(mapping => validStops[mapping.stopIndex]);
-            
-            // Check if order actually changed
-            stopsReordered = optimizedStops.some((stop, idx) => stop.id !== stops[idx]?.id);
-            
-            if (stopsReordered) {
-              console.log('Stops reordered based on optimized route:');
-              console.log('  Original order:', stops.map(s => s.name));
-              console.log('  Optimized order:', optimizedStops.map(s => s.name));
-              
-              // Update stops state with optimized order
-              setStops(optimizedStops);
-            } else {
-              console.log('Stops are already in optimal order');
-            }
-          } else if (stopMappings.length > 0 && stopWaypoints.length === validStops.length) {
-            // Partial match - try to use waypoint_index order as best guess
-            // This handles cases where coordinates don't match exactly
-            console.warn(`Partial match: matched ${stopMappings.length} out of ${validStops.length} stops`);
-            console.log('Attempting to reorder based on waypoint_index order...');
-            
-            // Use the waypoint order from the API response
-            // waypoint_index tells us the optimized position
-            const orderedByWaypointIndex = stopWaypoints
-              .map((wp, inputIndex) => ({
-                waypoint: wp,
-                waypoint_index: wp.waypoint_index !== undefined ? wp.waypoint_index : -1,
-                inputIndex: inputIndex // Original input order (0-based, excluding start)
-              }))
-              .filter(item => item.waypoint_index !== -1)
-              .sort((a, b) => a.waypoint_index - b.waypoint_index);
-            
-            // Map back to stops using input index
-            if (orderedByWaypointIndex.length === validStops.length) {
-              optimizedStops = orderedByWaypointIndex.map(item => validStops[item.inputIndex]);
-              
-              stopsReordered = optimizedStops.some((stop, idx) => stop.id !== stops[idx]?.id);
-              
-              if (stopsReordered) {
-                console.log('Stops reordered using waypoint_index fallback:');
-                console.log('  Original order:', stops.map(s => s.name));
-                console.log('  Optimized order:', optimizedStops.map(s => s.name));
-                
-                setStops(optimizedStops);
-              }
-            }
-          } else {
-            console.warn(`Could not reorder stops: matched ${stopMappings.length} out of ${validStops.length} stops`);
-            console.warn('Stop mappings:', stopMappings);
-          }
+        console.log('Optimization waypoints received:', optimizedWaypoints.map((wp, i) => ({
+          originalIndex: i,
+          waypoint_index: wp.waypoint_index,
+          location: wp.location
+        })));
+        
+        // Create mapping from original stop index to waypoint_index
+        // Original waypoints: [start(0), stop0(1), stop1(2), stop2(3), ...]
+        // We need to reorder stops based on waypoint_index
+        
+        // Build an array of {originalStopIndex, waypointIndex} for stops only (skip startpoint at index 0)
+        const stopMappings = [];
+        for (let i = 1; i < optimizedWaypoints.length; i++) {
+          const wp = optimizedWaypoints[i];
+          stopMappings.push({
+            originalStopIndex: i - 1, // Index in the original stops array
+            waypointIndex: wp.waypoint_index
+          });
         }
+        
+        // Sort by waypoint_index to get the optimized order
+        stopMappings.sort((a, b) => a.waypointIndex - b.waypointIndex);
+        
+        // Filter out the last waypoint if it's the same as the first (roundtrip return to start)
+        // The startpoint in roundtrip appears at waypoint_index 0 only
+        const reorderedStops = stopMappings
+          .filter(mapping => mapping.waypointIndex !== 0) // Skip if this is the startpoint position
+          .map(mapping => stops[mapping.originalStopIndex]);
+        
+        console.log('Stops reordered:', {
+          originalOrder: stops.map(s => s.address || s.name).slice(0, 3),
+          newOrder: reorderedStops.map(s => s.address || s.name).slice(0, 3),
+          totalStops: reorderedStops.length
+        });
         
         const calculatedRoute = {
           geometry: routeData.geometry,
           distance: routeData.distance,
           duration: routeData.duration,
-          waypoints: data.waypoints
+          waypoints: optimizedWaypoints
         };
         
-        console.log('Route optimized and calculated (handleOptimizeRoute)', {
+        console.log('Route optimized (handleOptimizeRoute), setting route state', {
           hasGeometry: !!calculatedRoute.geometry,
           coordinatesCount: calculatedRoute.geometry?.coordinates?.length,
           distance: calculatedRoute.distance,
-          duration: calculatedRoute.duration,
-          stopsReordered: stopsReordered
+          stopsReordered: reorderedStops.length !== stops.length || 
+            stops.some((s, i) => reorderedStops[i] !== s)
         });
         
-        // Set route state first (so Map component can render it immediately)
+        // Update stops with optimized order
+        setStops(reorderedStops);
+        
+        // Set route state (so Map component can render it immediately)
         setRoute({ ...calculatedRoute });
 
-        // Auto-save route with optimized stops and calculated route data
-        autoSaveRoute(optimizedStops, calculatedRoute, null).catch(err => {
+        // Auto-save route with calculated route data and reordered stops
+        autoSaveRoute(reorderedStops, calculatedRoute, null).catch(err => {
           console.error('Error auto-saving route:', err);
         });
       } else {
-        console.error('Mapbox API returned no route:', {
-          code: data.code,
-          message: data.message,
-          data: data
-        });
-        throw new Error(data.message || 'Geen route gevonden. Controleer of alle stops geldige coördinaten hebben.');
+        throw new Error(data.message || data.error || 'Geen route gevonden');
       }
     } catch (error) {
       console.error('Route optimalisatie error:', error);
@@ -1332,32 +911,7 @@ function AppContent() {
     setShowRouteChoiceModal(false);
     navigate('/route-aanmaken');
     setCurrentRouteId(route.id);
-    
-    // Ensure stops have valid structure and normalize coordinates
-    const loadedStops = (route.stops || []).map(stop => {
-      // Normalize coordinates to [lng, lat] format if they exist
-      if (stop.coordinates && Array.isArray(stop.coordinates) && stop.coordinates.length === 2) {
-        const normalizedCoords = normalizeCoordinates(stop.coordinates);
-        // Only update if coordinates were actually changed
-        if (normalizedCoords[0] !== stop.coordinates[0] || normalizedCoords[1] !== stop.coordinates[1]) {
-          console.log('Normalized coordinates for stop:', stop.name, stop.coordinates, '->', normalizedCoords);
-          return { ...stop, coordinates: normalizedCoords };
-        }
-        return stop;
-      }
-      // If coordinates are missing or invalid, log a warning
-      console.warn('Stop without valid coordinates:', stop);
-      return stop;
-    });
-    
-    console.log('Loading existing route:', {
-      routeId: route.id,
-      stopsCount: loadedStops.length,
-      stopsWithCoordinates: loadedStops.filter(s => s.coordinates && Array.isArray(s.coordinates)).length,
-      hasRouteData: !!route.route_data
-    });
-    
-    setStops(loadedStops);
+    setStops(route.stops || []);
     setRoute(route.route_data || null);
     if (route.selected_driver) {
       setSelectedDriver(route.selected_driver);
@@ -1474,8 +1028,8 @@ function AppContent() {
     return 'routes';
   };
 
-  // Check if we're on auth pages or onboarding
-  const isAuthPage = location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/onboarding' || location.pathname === '/on-boarding';
+  // Check if we're on auth pages
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
 
   return (
     <div className="app">
@@ -1486,22 +1040,6 @@ function AppContent() {
         <RouterRoutes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route 
-            path="/onboarding" 
-            element={
-              <ProtectedRoute>
-                <Onboarding />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/on-boarding" 
-            element={
-              <ProtectedRoute>
-                <Onboarding />
-              </ProtectedRoute>
-            } 
-          />
           <Route path="/chauffeur-login" element={<DriverLogin />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/checkout/success" element={<Checkout />} />
