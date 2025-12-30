@@ -414,7 +414,7 @@ app.get('/api/google-ads-auth', async (req, res) => {
   });
 });
 
-// Google Ads Costs Endpoint
+// Google Ads Costs Endpoint (using REST API)
 app.get('/api/google-ads-costs', async (req, res) => {
   try {
     // Validate configuration
@@ -432,23 +432,24 @@ app.get('/api/google-ads-costs', async (req, res) => {
       });
     }
 
-    // Import google-ads-api dynamically (ES module)
-    const { GoogleAdsApi } = await import('google-ads-api');
-
-    // Initialize client
-    const client = new GoogleAdsApi({
-      client_id: GOOGLE_ADS_CLIENT_ID,
-      client_secret: GOOGLE_ADS_CLIENT_SECRET,
-      developer_token: GOOGLE_ADS_DEVELOPER_TOKEN
-    });
-
-    // Get customer instance
-    const customer = client.Customer({
-      customer_id: GOOGLE_ADS_CUSTOMER_ID.replace(/-/g, ''),
+    // Create OAuth2 client
+    const oauth2Client = new google.auth.OAuth2(
+      GOOGLE_ADS_CLIENT_ID,
+      GOOGLE_ADS_CLIENT_SECRET
+    );
+    
+    oauth2Client.setCredentials({
       refresh_token: GOOGLE_ADS_REFRESH_TOKEN
     });
 
-    // Query for costs
+    // Get fresh access token
+    const { credentials } = await oauth2Client.refreshAccessToken();
+    const accessToken = credentials.access_token;
+
+    // Format customer ID (remove dashes)
+    const customerId = GOOGLE_ADS_CUSTOMER_ID.replace(/-/g, '');
+
+    // Use Google Ads REST API
     const query = `
       SELECT
         segments.date,
@@ -458,13 +459,45 @@ app.get('/api/google-ads-costs', async (req, res) => {
       ORDER BY segments.date DESC
     `;
 
-    const results = await customer.query(query);
+    const response = await fetch(
+      `https://googleads.googleapis.com/v18/customers/${customerId}/googleAds:searchStream`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'developer-token': GOOGLE_ADS_DEVELOPER_TOKEN,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ query })
+      }
+    );
 
-    // Transform results
-    const costs = results.map(row => ({
-      date: row.segments.date,
-      cost: (row.metrics.cost_micros / 1000000).toFixed(2)
-    }));
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Google Ads API error response:', errorData);
+      return res.status(response.status).json({
+        error: 'Google Ads API error',
+        message: errorData.error?.message || 'Unknown error',
+        details: errorData
+      });
+    }
+
+    const data = await response.json();
+    
+    // Parse results - REST API returns array of result batches
+    const costs = [];
+    if (data && Array.isArray(data)) {
+      for (const batch of data) {
+        if (batch.results) {
+          for (const row of batch.results) {
+            costs.push({
+              date: row.segments?.date || 'unknown',
+              cost: ((row.metrics?.costMicros || 0) / 1000000).toFixed(2)
+            });
+          }
+        }
+      }
+    }
 
     // Calculate total
     const totalCost = costs.reduce((sum, row) => sum + parseFloat(row.cost), 0);
