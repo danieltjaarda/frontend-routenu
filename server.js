@@ -355,7 +355,9 @@ app.post('/api/optimize-route', async (req, res) => {
 
 // Google Ads OAuth2 Authorization Flow
 app.get('/api/google-ads-auth', async (req, res) => {
-  const REDIRECT_URI = process.env.GOOGLE_ADS_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/google-ads-auth`;
+  // Always use https in production (Render uses reverse proxy)
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+  const REDIRECT_URI = process.env.GOOGLE_ADS_REDIRECT_URI || `https://${req.get('host')}/api/google-ads-auth`;
 
   if (!GOOGLE_ADS_CLIENT_ID || !GOOGLE_ADS_CLIENT_SECRET) {
     return res.status(500).json({
