@@ -45,12 +45,26 @@ export const getUserRoutes = async (userId) => {
   try {
     const { data, error } = await supabase
       .from('routes')
-      .select('*')
+      .select(`
+        *,
+        drivers (
+          id,
+          name,
+          email
+        )
+      `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    
+    // Map the data to include driver name from the join
+    const routesWithDriverName = (data || []).map(route => ({
+      ...route,
+      driver_name: route.drivers?.name || route.selected_driver || null
+    }));
+    
+    return routesWithDriverName;
   } catch (error) {
     console.error('Error getting routes:', error);
     throw error;
@@ -129,6 +143,7 @@ export const saveOrder = async (userId, orderData) => {
       email: orderData.email || null,
       phone: orderData.phone || null,
       order_type: orderData.orderType || orderData.order_type || null,
+      service_time: orderData.serviceTime || orderData.service_time || 5, // Service tijd in minuten
       customer_info: orderData.customerInfo || orderData.customer_info || null
     };
 
@@ -268,18 +283,24 @@ export const deleteItem = async (tableName, itemId) => {
 // Update item
 export const updateItem = async (tableName, itemId, updates) => {
   try {
+    // Build update object - only add updated_at if it's likely to exist
+    const updateData = { ...updates };
+    
+    // Add updated_at for tables that typically have it
+    if (['routes', 'vehicles', 'orders', 'email_templates', 'user_profiles', 'drivers'].includes(tableName)) {
+      updateData.updated_at = new Date().toISOString();
+    }
+    
     const { data, error } = await supabase
       .from(tableName)
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', itemId)
-      .select()
-      .single();
+      .select();
 
     if (error) throw error;
-    return data;
+    
+    // Return first item or null
+    return data && data.length > 0 ? data[0] : null;
   } catch (error) {
     console.error('Error updating item:', error);
     throw error;
@@ -654,7 +675,7 @@ export const sendWebhook = async (webhookUrl, templateType, data) => {
 };
 
 // Recalculate arrival times based on actual arrival times
-export const recalculateArrivalTimes = async (routeId, routeData, actualTimestamps) => {
+export const recalculateArrivalTimes = async (routeId, routeData, actualTimestamps, userServiceTime = null) => {
   try {
     if (!routeData || !routeData.stops || routeData.stops.length === 0) {
       return [];
@@ -664,7 +685,7 @@ export const recalculateArrivalTimes = async (routeId, routeData, actualTimestam
     const routeStartTime = actualTimestamps.find(t => t.stop_index === -1)?.route_started_at;
     if (!routeStartTime) {
       // Fallback to original calculation if no start time
-      return calculateOriginalArrivalTimes(routeData, routeData.route_started_at);
+      return calculateOriginalArrivalTimes(routeData, routeData.route_started_at, userServiceTime);
     }
 
     const startTime = new Date(routeStartTime);
@@ -677,9 +698,11 @@ export const recalculateArrivalTimes = async (routeId, routeData, actualTimestam
       if (timestamp && timestamp.actual_arrival_time) {
         // Use actual arrival time
         const arrivalTime = new Date(timestamp.actual_arrival_time);
+        // Use service time from user profile (if provided), otherwise from route_data, or default 5 minutes
+        const serviceTimeMinutes = userServiceTime || routeData.route_data?.service_time || 5;
         const departureTime = timestamp.actual_departure_time 
           ? new Date(timestamp.actual_departure_time)
-          : new Date(arrivalTime.getTime() + (5 * 60 * 1000)); // Default 5 min
+          : new Date(arrivalTime.getTime() + (serviceTimeMinutes * 60 * 1000));
         
         recalculatedTimes.push({
           arrival: arrivalTime.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }),
@@ -713,7 +736,9 @@ export const recalculateArrivalTimes = async (routeId, routeData, actualTimestam
           }
         }
         
-        const estimatedDeparture = new Date(estimatedArrival.getTime() + (5 * 60 * 1000));
+        // Use service time from user profile (if provided), otherwise from route_data, or default 5 minutes
+        const serviceTimeMinutes = userServiceTime || routeData.route_data?.service_time || 5;
+        const estimatedDeparture = new Date(estimatedArrival.getTime() + (serviceTimeMinutes * 60 * 1000));
         
         recalculatedTimes.push({
           arrival: estimatedArrival.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }),
@@ -728,12 +753,12 @@ export const recalculateArrivalTimes = async (routeId, routeData, actualTimestam
   } catch (error) {
     console.error('Error recalculating arrival times:', error);
     const routeStartTime = actualTimestamps?.find(t => t.stop_index === -1)?.route_started_at;
-    return calculateOriginalArrivalTimes(routeData, routeStartTime || routeData.route_started_at);
+    return calculateOriginalArrivalTimes(routeData, routeStartTime || routeData.route_started_at, userServiceTime);
   }
 };
 
 // Calculate original arrival times (fallback)
-const calculateOriginalArrivalTimes = (routeData, routeStartTime = null) => {
+const calculateOriginalArrivalTimes = (routeData, routeStartTime = null, userServiceTime = null) => {
   if (!routeData || !routeData.stops || routeData.stops.length === 0) return [];
   
   // Use route_started_at if available, otherwise use departure_time from route data
@@ -760,7 +785,9 @@ const calculateOriginalArrivalTimes = (routeData, routeStartTime = null) => {
       cumulativeDuration += segmentDuration;
       
       const arrivalTime = new Date(startTime.getTime() + (cumulativeDuration * 1000));
-      const departureTime = new Date(arrivalTime.getTime() + (5 * 60 * 1000));
+      // Use service time from user profile (if provided), otherwise from route_data, or default 5 minutes
+      const serviceTimeMinutes = userServiceTime || routeData.route_data?.service_time || 5;
+      const departureTime = new Date(arrivalTime.getTime() + (serviceTimeMinutes * 60 * 1000));
       
       times.push({
         arrival: arrivalTime.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }),

@@ -112,7 +112,38 @@
 }
 
 .actions-cell {
-  width: 80px;
+  width: 120px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-edit {
+  background: transparent;
+  color: #0CC0DF;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.btn-edit:hover {
+  background: #e0f7fa;
+  color: #0AA5C0;
+}
+
+.btn-edit svg {
+  width: 16px;
+  height: 16px;
 }
 
 .btn-delete {
@@ -263,6 +294,12 @@
 .form-group input:disabled,
 .form-group select:disabled {
   background: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.form-group input.input-disabled {
+  background: #f5f5f5;
+  color: #666;
   cursor: not-allowed;
 }
 

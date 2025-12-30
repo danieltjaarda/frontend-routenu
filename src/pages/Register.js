@@ -208,7 +208,7 @@ function Register() {
             <div className="confetti"></div>
           </div>
           <span className="trial-emoji">🎉</span>
-          <span className="trial-text">Probeer nu 14 dagen gratis!</span>
+          <span className="trial-text">Eerste 3 dagen gratis, daarna €29/maand</span>
           <span className="trial-emoji">🎉</span>
         </div>
 

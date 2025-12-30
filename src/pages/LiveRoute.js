@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { recalculateArrivalTimes, getRouteStopTimestamps } from '../services/userData';
+import { recalculateArrivalTimes, getRouteStopTimestamps, getUserProfile } from '../services/userData';
+import { useAuth } from '../contexts/AuthContext';
 import './LiveRoute.css';
 
 function LiveRoute() {
   const { routeId, token, email: emailParam } = useParams();
+  const { currentUser } = useAuth();
   const [route, setRoute] = useState(null);
   const [timestamps, setTimestamps] = useState([]);
   const [recalculatedTimes, setRecalculatedTimes] = useState([]);
@@ -14,6 +16,7 @@ function LiveRoute() {
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [estimatedArrival, setEstimatedArrival] = useState(null);
   const [targetStopIndex, setTargetStopIndex] = useState(undefined);
+  const [userServiceTime, setUserServiceTime] = useState(5); // Default service time
   
   // Find stop index based on email if provided
   useEffect(() => {
@@ -34,11 +37,29 @@ function LiveRoute() {
     }
   }, [emailParam, route]);
 
+  // Load user service time if authenticated
+  useEffect(() => {
+    const loadUserServiceTime = async () => {
+      if (currentUser) {
+        try {
+          const profile = await getUserProfile(currentUser.id);
+          if (profile?.service_time) {
+            setUserServiceTime(profile.service_time);
+          }
+        } catch (error) {
+          console.error('Error loading user service time:', error);
+        }
+      }
+    };
+    loadUserServiceTime();
+  }, [currentUser]);
+
   useEffect(() => {
     loadRouteData();
     
-    // Poll for updates every 10 seconds
+    // Poll for updates every 10 seconds only if route is started
     const interval = setInterval(() => {
+      // Only poll if route is started (we'll check this in loadRouteData)
       loadRouteData();
     }, 10000);
 
@@ -47,6 +68,15 @@ function LiveRoute() {
 
   const loadRouteData = async () => {
     try {
+      // Debug: Log environment info
+      console.log('=== LIVE ROUTE DEBUG ===');
+      console.log('Environment:', {
+        isProduction: process.env.NODE_ENV === 'production',
+        supabaseUrl: process.env.REACT_APP_SUPABASE_URL ? 'SET' : 'MISSING',
+        supabaseKey: process.env.REACT_APP_SUPABASE_ANON_KEY ? 'SET' : 'MISSING',
+        location: window.location.href,
+        isAuthenticated: !!currentUser
+      });
       console.log('Loading route data for:', { 
         routeId, 
         token, 
@@ -69,6 +99,16 @@ function LiveRoute() {
         routeStatus: routeData?.route_status,
         error: routeError 
       });
+      
+      // Debug: Log full error details
+      if (routeError) {
+        console.error('=== SUPABASE ERROR DETAILS ===');
+        console.error('Error Code:', routeError.code);
+        console.error('Error Message:', routeError.message);
+        console.error('Error Details:', routeError.details);
+        console.error('Error Hint:', routeError.hint);
+        console.error('Full Error Object:', JSON.stringify(routeError, null, 2));
+      }
 
       if (routeError) {
         console.error('Route error details:', {
@@ -99,32 +139,38 @@ function LiveRoute() {
         return;
       }
 
-      // Verify token - check if it matches the general route token
-      const tokenValid = routeData.live_route_token === token;
-      
-      if (!tokenValid) {
-        console.error('Token mismatch:', { 
-          expected: routeData.live_route_token, 
-          actual: token,
-          emailParam,
-          routeId
-        });
-        setError('Route niet gevonden of link is ongeldig. Controleer of de token correct is.');
+      // Verify token if provided in URL
+      if (token) {
+        // Verify token - check if it matches the general route token
+        const tokenValid = routeData.live_route_token === token;
+        
+        if (!tokenValid) {
+          console.error('Token mismatch:', { 
+            expected: routeData.live_route_token, 
+            actual: token,
+            emailParam,
+            routeId,
+            routeStatus: routeData.route_status
+          });
+          setError('Route niet gevonden of link is ongeldig. Controleer of de token correct is.');
+          setLoading(false);
+          return;
+        }
+        
+        console.log('✓ Token verified');
+      } else if (routeData.route_status === 'started') {
+        // Route is started but no token provided - this shouldn't happen for public links
+        console.warn('Route is started but no token provided in URL');
+        setError('Route niet gevonden of link is ongeldig. Token ontbreekt in de link.');
         setLoading(false);
         return;
+      } else {
+        // Route not started yet - token is optional, show route info
+        console.log('Route not started yet, showing route info without live tracking');
       }
-      
-      console.log('✓ Token verified');
       
       // Log for debugging
       console.log('Token verified, emailParam:', emailParam, 'targetStopIndex:', targetStopIndex, 'will show', targetStopIndex !== undefined ? 'only stop ' + targetStopIndex : 'all stops');
-
-      // Only show if route is started
-      if (routeData.route_status !== 'started') {
-        setError(`Route is nog niet gestart. Status: ${routeData.route_status || 'unknown'}`);
-        setLoading(false);
-        return;
-      }
 
       setRoute(routeData);
 
@@ -152,7 +198,7 @@ function LiveRoute() {
           const allEstimatedTimes = calculateEstimatedArrivalForAllStops(routeData, timestampsData || []);
           
           // Also get recalculated times from service (for actual arrival times)
-          const recalculated = await recalculateArrivalTimes(routeId, routeData, timestampsData || []);
+          const recalculated = await recalculateArrivalTimes(routeId, routeData, timestampsData || [], userServiceTime);
           
           // Merge estimated times with actual times
           const mergedTimes = routeData.stops.map((stop, index) => {
@@ -251,9 +297,11 @@ function LiveRoute() {
         console.log(`Found last completed stop: ${i}, departed at:`, lastDepartureTime);
         break;
       } else if (timestamp && timestamp.actual_arrival_time) {
-        // If only arrival time exists, use arrival + 5 minutes as departure
+        // If only arrival time exists, use arrival + service time as departure
         lastCompletedIndex = i;
-        lastDepartureTime = new Date(new Date(timestamp.actual_arrival_time).getTime() + (5 * 60 * 1000));
+        // Use service time from user profile (if available), otherwise from route_data, or default 5 minutes
+        const serviceTimeMinutes = userServiceTime || routeData.route_data?.service_time || 5;
+        lastDepartureTime = new Date(new Date(timestamp.actual_arrival_time).getTime() + (serviceTimeMinutes * 60 * 1000));
         console.log(`Found last completed stop (arrival only): ${i}, estimated departure at:`, lastDepartureTime);
         break;
       }
@@ -313,9 +361,11 @@ function LiveRoute() {
 
       // Calculate estimated arrival and departure time
       const estimatedArrival = new Date(lastDepartureTime.getTime() + (cumulativeDuration * 1000));
-      const estimatedDeparture = new Date(estimatedArrival.getTime() + (5 * 60 * 1000)); // 5 minutes per stop
+      // Use service time from user profile (if available), otherwise from route_data, or default 5 minutes
+      const serviceTimeMinutes = userServiceTime || routeData.route_data?.service_time || 5;
+      const estimatedDeparture = new Date(estimatedArrival.getTime() + (serviceTimeMinutes * 60 * 1000));
       
-      console.log(`Stop ${stopIndex}: segment=${Math.round(segmentDuration)}s, cumulative=${Math.round(cumulativeDuration)}s, arrival=${estimatedArrival.toLocaleTimeString()}`);
+      console.log(`Stop ${stopIndex}: segment=${Math.round(segmentDuration)}s, cumulative=${Math.round(cumulativeDuration)}s, arrival=${estimatedArrival.toLocaleTimeString()}, serviceTime=${serviceTimeMinutes}min`);
       
       estimatedTimes[stopIndex] = {
         arrival: estimatedArrival.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }),
@@ -339,7 +389,13 @@ function LiveRoute() {
   if (loading) {
     return (
       <div className="live-route-page">
-        <div className="loading-message">Route laden...</div>
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <div className="loading-text">
+            <h2>Live link starten</h2>
+            <p>Even geduld, we zijn al je gegevens aan het ophalen...</p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -368,29 +424,47 @@ function LiveRoute() {
       })
     : 'vandaag';
 
+  const isRouteStarted = route.route_status === 'started';
+
   return (
     <div className="live-route-page">
       <div className="live-route-header">
         <img src="/logo.png" alt="RouteNu" className="live-route-logo" />
-        <h1>Route Live Bekijken</h1>
+        <h1>{isRouteStarted ? 'Route Live Bekijken' : 'Route Informatie'}</h1>
         <p className="route-name">{route.name || 'Route'}</p>
         <p className="route-date">{routeDate}</p>
-        <p className="last-update">Laatste update: {lastUpdate.toLocaleTimeString('nl-NL')}</p>
+        {isRouteStarted && (
+          <p className="last-update">Laatste update: {lastUpdate.toLocaleTimeString('nl-NL')}</p>
+        )}
       </div>
 
       <div className="live-route-status">
-        <div className="status-badge started">
-          <span className="status-dot"></span>
-          Route is onderweg
-        </div>
+        {isRouteStarted ? (
+          <div className="status-badge started">
+            <span className="status-dot"></span>
+            Route is onderweg
+          </div>
+        ) : (
+          <div className="status-badge not-started">
+            <span className="status-dot"></span>
+            Route nog niet gestart
+          </div>
+        )}
       </div>
 
-      {route.route_started_at && (
+      {isRouteStarted && route.route_started_at && (
         <div className="route-start-info">
           <p><strong>Route gestart om:</strong> {formatTime(route.route_started_at)}</p>
         </div>
       )}
 
+      {!isRouteStarted && (
+        <div className="route-not-started-info">
+          <p>De route is nog niet gestart. U ontvangt een nieuwe link zodra de route is gestart en u kunt de route live volgen.</p>
+        </div>
+      )}
+
+      {isRouteStarted && (
       <div className="stops-list">
         <h2>{targetStopIndex !== undefined && !isNaN(targetStopIndex) ? 'Uw Stop' : 'Stops'}</h2>
         {route.stops && route.stops.length > 0 ? (
@@ -487,10 +561,13 @@ function LiveRoute() {
           <p>Geen stops beschikbaar</p>
         )}
       </div>
+      )}
 
+      {isRouteStarted && (
       <div className="auto-refresh-note">
         <p>Deze pagina wordt automatisch elke 10 seconden bijgewerkt</p>
       </div>
+      )}
     </div>
   );
 }

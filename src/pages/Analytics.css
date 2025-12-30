@@ -250,6 +250,21 @@
   font-weight: 600;
 }
 
+.btw-cost {
+  color: #F57C00 !important;
+  font-size: 13px;
+  margin-top: 4px !important;
+}
+
+.netto-profit {
+  color: #2E7D32 !important;
+  font-weight: 700;
+  font-size: 16px;
+  margin-top: 8px !important;
+  padding-top: 8px;
+  border-top: 1px dashed #ccc;
+}
+
 .stop-details-list {
   margin-top: 16px;
   padding-top: 16px;
@@ -294,4 +309,172 @@
   padding: 60px 20px;
   font-size: 16px;
   color: #666;
+}
+
+/* Settings Button */
+.btn-settings {
+  width: 40px;
+  height: 40px;
+  border: 1px solid #ddd;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-settings:hover {
+  border-color: #0CC0DF;
+  background: #f0f9ff;
+  transform: rotate(90deg);
+}
+
+/* Settings Modal */
+.settings-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.settings-modal {
+  background: white;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 450px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.settings-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #eee;
+}
+
+.settings-modal-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+}
+
+.settings-modal-header .close-button {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.settings-modal-header .close-button:hover {
+  background: #f5f5f5;
+  color: #333;
+}
+
+.settings-modal-body {
+  padding: 24px;
+}
+
+.settings-group {
+  margin-bottom: 20px;
+}
+
+.settings-group label {
+  display: block;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.settings-group input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.settings-group input:focus {
+  outline: none;
+  border-color: #0CC0DF;
+}
+
+.settings-group small {
+  display: block;
+  margin-top: 8px;
+  color: #666;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.settings-modal-footer {
+  display: flex;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid #eee;
+  background: #f9f9f9;
+}
+
+.settings-modal-footer .btn-cancel {
+  flex: 1;
+  padding: 12px 24px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: white;
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.settings-modal-footer .btn-cancel:hover {
+  border-color: #999;
+  color: #333;
+}
+
+.settings-modal-footer .btn-save {
+  flex: 1;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  background: #0CC0DF;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.settings-modal-footer .btn-save:hover {
+  background: #0aa8c4;
+}
+
+/* Green highlight card for net profit */
+.summary-card.highlight-green {
+  border-color: #4CAF50;
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
 }

@@ -349,6 +349,41 @@
   border-color: #bbb;
 }
 
+.btn-copy {
+  padding: 8px;
+  background: transparent;
+  color: #9c27b0;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+}
+
+.btn-copy:hover:not(:disabled) {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.btn-copy:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-copy svg {
+  width: 16px;
+  height: 16px;
+}
+
+.copy-loading {
+  font-size: 14px;
+  color: #999;
+}
+
 .btn-download {
   padding: 8px;
   background: transparent;

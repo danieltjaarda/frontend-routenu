@@ -305,10 +305,10 @@ function AppContent() {
               year: 'numeric' 
             })
           : 'vandaag';
-        const routeLink = routeId ? `https://app.routenu.nl/route/${routeId}` : '#';
+        const routeLink = routeId ? `https://routenu.nl/route/${routeId}` : '#';
         
         savedTemplate = {
-          subject: `Welkom bij RouteNu - U bent toegevoegd aan route \${routeName}`,
+          subject: `Welkom bij RouteNu - U bent toegevoegd aan route ${routeNameForTemplate}`,
           html_content: `<!DOCTYPE html>
 <html>
 <head>
@@ -353,54 +353,22 @@ function AppContent() {
 </head>
 <body>
   <div class="header">
-    <h1>Routenu.nl</h1>
+    <h1>RouteNu</h1>
   </div>
   <div class="content">
-    <h2>Beste \${stopName},</h2>
-    <p>De route <strong>\${routeName}</strong> is aangemaakt en u bent aangemeld voor deze route op <strong>\${routeDate}</strong>.</p>
+    <h2>Beste ${stop.name || 'klant'},</h2>
+    <p>De route <strong>${routeNameForTemplate}</strong> is aangemaakt en u bent aangemeld voor deze route op <strong>${routeDateForTemplate}</strong>.</p>
     <div class="info-box">
       <p><strong>Uw stop:</strong></p>
-      <p>\${stopAddress}</p>
+      <p>${stop.address || 'Adres wordt binnenkort toegevoegd'}</p>
     </div>
     <p>U ontvangt verdere informatie zodra de route is berekend en geoptimaliseerd.</p>
-    <a href="\${liveRouteLink}" class="button">Bekijk route</a>
+    <a href="${routeLink}" class="button">Bekijk route</a>
   </div>
 </body>
 </html>`,
           from_email: 'noreply@routenu.nl'
         };
-      }
-
-      // Haal of genereer token voor deze route
-      let liveRouteToken = null;
-      if (routeId) {
-        try {
-          const { supabase } = await import('./lib/supabase');
-          // Check of route al een token heeft
-          const { data: routeData } = await supabase
-            .from('routes')
-            .select('live_route_token')
-            .eq('id', routeId)
-            .eq('user_id', currentUser.id)
-            .maybeSingle();
-          
-          if (routeData?.live_route_token) {
-            liveRouteToken = routeData.live_route_token;
-          } else {
-            // Genereer nieuwe token en sla op
-            liveRouteToken = `${routeId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-            await supabase
-              .from('routes')
-              .update({ live_route_token: liveRouteToken })
-              .eq('id', routeId)
-              .eq('user_id', currentUser.id);
-            console.log('✓ Generated and saved new live_route_token for route:', routeId);
-          }
-        } catch (error) {
-          console.error('Error getting/generating token:', error);
-          // Genereer token lokaal als fallback (wordt niet opgeslagen)
-          liveRouteToken = `${routeId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-        }
       }
 
       // Vervang template variabelen
@@ -412,69 +380,42 @@ function AppContent() {
             year: 'numeric' 
           })
         : 'vandaag';
-      
-      // Genereer persoonlijke link met token en email
-      const encodedEmail = stop.email ? encodeURIComponent(stop.email.trim().toLowerCase()) : '';
-      const liveRouteLink = routeId && liveRouteToken && encodedEmail 
-        ? `https://app.routenu.nl/route/${routeId}/${liveRouteToken}/${encodedEmail}`
-        : routeId 
-        ? `https://app.routenu.nl/route/${routeId}`
-        : '#';
-      const routeLink = liveRouteLink; // Use same link for backwards compatibility
+      const routeLink = routeId ? `https://routenu.nl/route/${routeId}` : '#';
       
       let htmlContent = savedTemplate.html_content
         .replace(/\$\{stopName\}/g, stop.name || 'klant')
         .replace(/\$\{stopAddress\}/g, stop.address || 'Adres wordt binnenkort toegevoegd')
         .replace(/\$\{routeName\}/g, routeNameForTemplate)
         .replace(/\$\{routeDate\}/g, routeDateForTemplate)
-        .replace(/\$\{liveRouteLink\}/g, liveRouteLink)
-        .replace(/\$\{routeLink\}/g, routeLink); // Backwards compatibility
+        .replace(/\$\{routeLink\}/g, routeLink);
 
       let subject = savedTemplate.subject
         .replace(/\$\{stopName\}/g, stop.name || 'klant')
         .replace(/\$\{stopAddress\}/g, stop.address || 'Adres wordt binnenkort toegevoegd')
         .replace(/\$\{routeName\}/g, routeNameForTemplate)
         .replace(/\$\{routeDate\}/g, routeDateForTemplate)
-        .replace(/\$\{liveRouteLink\}/g, liveRouteLink)
-        .replace(/\$\{routeLink\}/g, routeLink); // Backwards compatibility
+        .replace(/\$\{routeLink\}/g, routeLink);
 
       // Verstuur e-mail
-      let emailSent = false;
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/send-email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            from: savedTemplate.from_email || 'noreply@routenu.nl',
-            to: stop.email.trim(),
-            subject: subject,
-            html: htmlContent
-          })
-        });
+      const response = await fetch(`${API_BASE_URL}/api/send-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: savedTemplate.from_email || 'noreply@routenu.nl',
+          to: stop.email.trim(),
+          subject: subject,
+          html: htmlContent
+        })
+      });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('Error sending welcome email:', errorData);
-        } else {
-          emailSent = true;
-          console.log('✅ Welcome email sent successfully');
-        }
-      } catch (emailError) {
-        console.error('Error sending welcome email:', emailError);
-      }
-
-      // Verstuur webhook ALTIJD (ook als e-mail faalt) als webhook URL bestaat
-      if (savedTemplate.webhook_url && savedTemplate.webhook_url.trim()) {
-        console.log('🚀 Sending webhook for klant-aangemeld:', {
-          webhookUrl: savedTemplate.webhook_url,
-          hasWebhookUrl: !!savedTemplate.webhook_url,
-          webhookUrlLength: savedTemplate.webhook_url.length,
-          emailSent: emailSent
-        });
-        
-        try {
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error sending welcome email:', errorData);
+      } else {
+        // Verstuur webhook als e-mail succesvol is verzonden en webhook URL bestaat
+        if (savedTemplate.webhook_url) {
           await sendWebhook(savedTemplate.webhook_url, 'klant-aangemeld', {
             stopName: stop.name || '',
             name: stop.name || '',
@@ -486,16 +427,7 @@ function AppContent() {
             routeDate: routeDateForTemplate,
             routeLink: routeLink
           });
-          console.log('✅ Webhook sent successfully for klant-aangemeld');
-        } catch (webhookError) {
-          console.error('❌ Error sending webhook:', webhookError);
         }
-      } else {
-        console.log('⚠️ No webhook URL configured for klant-aangemeld template:', {
-          hasSavedTemplate: !!savedTemplate,
-          webhookUrl: savedTemplate?.webhook_url,
-          webhookUrlType: typeof savedTemplate?.webhook_url
-        });
       }
     } catch (error) {
       console.error('Error sending welcome email:', error);
@@ -663,6 +595,18 @@ function AppContent() {
     await autoSaveRoute(updatedStops, null);
   };
 
+  // Reverse the order of all stops
+  const handleReverseRoute = async () => {
+    if (stops.length < 2) return; // No point reversing 0 or 1 stops
+    
+    const reversedStops = [...stops].reverse();
+    setStops(reversedStops);
+    setRoute(null); // Clear route when order changes
+    
+    // Auto-save route after reversing
+    await autoSaveRoute(reversedStops, null);
+  };
+
   // Calculate route based on current stop order (no optimization)
   const handleCalculateRoute = async () => {
     if (stops.length < 1) {
@@ -750,124 +694,65 @@ function AppContent() {
     setIsOptimizing(true);
     try {
       // Get startpoint from user profile or use first stop
-      let startCoords = null;
+      let startCoordinates = null;
       if (userProfile?.start_coordinates) {
-        startCoords = userProfile.start_coordinates;
+        startCoordinates = userProfile.start_coordinates;
       } else if (stops.length > 0) {
-        startCoords = stops[0].coordinates;
+        startCoordinates = stops[0].coordinates;
       } else {
         alert('Geen startpunt gevonden. Stel een startpunt in via Instellingen.');
         setIsOptimizing(false);
         return;
       }
 
-      // Build waypoints array: startpoint + all stops
-      // Note: We don't add endpoint as Mapbox Optimization API handles roundtrip=true
-      const waypoints = [
-        { coordinates: startCoords },
-        ...stops.map(stop => ({ coordinates: stop.coordinates }))
-      ];
-
-      // Check maximum waypoints limit (Mapbox Optimization API supports max 12)
-      if (waypoints.length > 12) {
-        alert(`Maximum 12 waypoints ondersteund voor optimalisatie. Je hebt ${waypoints.length} waypoints (inclusief startpunt). Verwijder ${waypoints.length - 12} stops.`);
-        setIsOptimizing(false);
-        return;
-      }
-
-      console.log('Calling optimize-route API with waypoints:', waypoints.length);
+      // Format: startpoint;stop1;stop2;...;startpoint (startpoint first, then stops, then back to start)
+      const stopCoordinates = stops.map(stop => `${stop.coordinates[0]},${stop.coordinates[1]}`).join(';');
+      const coordinates = `${startCoordinates[0]},${startCoordinates[1]};${stopCoordinates};${startCoordinates[0]},${startCoordinates[1]}`;
       
-      // Call server-side optimization endpoint that uses Mapbox Optimization API
-      const response = await fetch(`${API_BASE_URL}/optimize-route`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          waypoints,
-          profile: 'driving'
-        })
-      });
+      // Gebruik Directions API met public token (werkt vanuit browser)
+      // Voor meerdere stops gebruiken we waypoints
+      const response = await fetch(
+        `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?` +
+        `access_token=${MAPBOX_PUBLIC_TOKEN}&` +
+        `geometries=geojson&` +
+        `overview=full&` +
+        `steps=true&` +
+        `annotations=duration,distance`
+      );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || errorData.message || 'Route optimalisatie mislukt');
+        throw new Error(errorData.message || 'Route optimalisatie mislukt');
       }
 
       const data = await response.json();
       
-      // Optimization API response (converted to Directions format by server)
+      // Directions API response
       if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
         const routeData = data.routes[0];
-        
-        // IMPORTANT: Reorder stops based on optimized waypoint_index
-        // The waypoints array contains: [startpoint, stop1, stop2, ...]
-        // waypoint_index tells us the optimized order
-        // Skip waypoint index 0 (startpoint) and handle roundtrip endpoint
-        const optimizedWaypoints = data.waypoints || [];
-        
-        console.log('Optimization waypoints received:', optimizedWaypoints.map((wp, i) => ({
-          originalIndex: i,
-          waypoint_index: wp.waypoint_index,
-          location: wp.location
-        })));
-        
-        // Create mapping from original stop index to waypoint_index
-        // Original waypoints: [start(0), stop0(1), stop1(2), stop2(3), ...]
-        // We need to reorder stops based on waypoint_index
-        
-        // Build an array of {originalStopIndex, waypointIndex} for stops only (skip startpoint at index 0)
-        const stopMappings = [];
-        for (let i = 1; i < optimizedWaypoints.length; i++) {
-          const wp = optimizedWaypoints[i];
-          stopMappings.push({
-            originalStopIndex: i - 1, // Index in the original stops array
-            waypointIndex: wp.waypoint_index
-          });
-        }
-        
-        // Sort by waypoint_index to get the optimized order
-        stopMappings.sort((a, b) => a.waypointIndex - b.waypointIndex);
-        
-        // Filter out the last waypoint if it's the same as the first (roundtrip return to start)
-        // The startpoint in roundtrip appears at waypoint_index 0 only
-        const reorderedStops = stopMappings
-          .filter(mapping => mapping.waypointIndex !== 0) // Skip if this is the startpoint position
-          .map(mapping => stops[mapping.originalStopIndex]);
-        
-        console.log('Stops reordered:', {
-          originalOrder: stops.map(s => s.address || s.name).slice(0, 3),
-          newOrder: reorderedStops.map(s => s.address || s.name).slice(0, 3),
-          totalStops: reorderedStops.length
-        });
-        
         const calculatedRoute = {
           geometry: routeData.geometry,
           distance: routeData.distance,
           duration: routeData.duration,
-          waypoints: optimizedWaypoints
+          waypoints: data.waypoints
         };
         
-        console.log('Route optimized (handleOptimizeRoute), setting route state', {
+        console.log('Route calculated (handleOptimizeRoute), setting route state', {
           hasGeometry: !!calculatedRoute.geometry,
           coordinatesCount: calculatedRoute.geometry?.coordinates?.length,
-          distance: calculatedRoute.distance,
-          stopsReordered: reorderedStops.length !== stops.length || 
-            stops.some((s, i) => reorderedStops[i] !== s)
+          distance: calculatedRoute.distance
         });
         
-        // Update stops with optimized order
-        setStops(reorderedStops);
-        
-        // Set route state (so Map component can render it immediately)
+        // Set route state first (so Map component can render it immediately)
+        // Use a new object reference to ensure React detects the change
         setRoute({ ...calculatedRoute });
 
-        // Auto-save route with calculated route data and reordered stops
-        autoSaveRoute(reorderedStops, calculatedRoute, null).catch(err => {
+        // Auto-save route with calculated route data (async, doesn't block rendering)
+        autoSaveRoute(stops, calculatedRoute, null).catch(err => {
           console.error('Error auto-saving route:', err);
         });
       } else {
-        throw new Error(data.message || data.error || 'Geen route gevonden');
+        throw new Error(data.message || 'Geen route gevonden');
       }
     } catch (error) {
       console.error('Route optimalisatie error:', error);
@@ -1186,6 +1071,7 @@ function AppContent() {
                         route={route}
                         onRemoveStop={handleRemoveStop}
                         onReorderStops={handleReorderStops}
+                        onReverseRoute={handleReverseRoute}
                         startAddress={userProfile?.start_address}
                         onEditStop={handleEditStop}
                         onCalculateRoute={handleCalculateRoute}

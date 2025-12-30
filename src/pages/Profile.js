@@ -10,6 +10,7 @@ function Profile() {
   const { currentUser, logout } = useAuth();
   const [startAddress, setStartAddress] = useState('');
   const [startCoordinates, setStartCoordinates] = useState(null);
+  const [serviceTime, setServiceTime] = useState(5); // Service tijd in minuten
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
@@ -43,6 +44,7 @@ function Profile() {
       } else if (data) {
         setStartAddress(data.start_address || '');
         setStartCoordinates(data.start_coordinates || null);
+        setServiceTime(data.service_time || 5);
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -157,12 +159,13 @@ function Profile() {
         .from('user_profiles')
         .select('id')
         .eq('user_id', currentUser.id)
-        .single();
+        .maybeSingle();
 
       const profileData = {
         user_id: currentUser.id,
         start_address: startAddress,
         start_coordinates: startCoordinates,
+        service_time: serviceTime || 5,
         updated_at: new Date().toISOString()
       };
 
@@ -216,12 +219,16 @@ function Profile() {
 
       <div className="profile-content">
         <div className="settings-section">
-          <h2>Startpunt</h2>
-          <p className="settings-description">
-            Dit startpunt wordt standaard gebruikt bij elke route.
-          </p>
+          <h2>Account</h2>
+          
+          <div className="account-settings">
+            <div className="account-setting-item">
+              <h3>Startpunt</h3>
+              <p className="settings-description">
+                Dit startpunt wordt standaard gebruikt bij elke route.
+              </p>
 
-          <form onSubmit={handleSave} className="startpoint-form">
+              <form onSubmit={handleSave} className="startpoint-form">
             <div className="form-group">
               <label htmlFor="startAddress">Startpunt adres *</label>
               <div className="address-input-wrapper">
@@ -267,14 +274,92 @@ function Profile() {
               </div>
             )}
 
-            <button
-              type="submit"
-              className="btn-save"
-              disabled={saving || !startAddress.trim() || !startCoordinates}
-            >
-              {saving ? 'Opslaan...' : 'Opslaan'}
-            </button>
-          </form>
+                <button
+                  type="submit"
+                  className="btn-save"
+                  disabled={saving || !startAddress.trim() || !startCoordinates}
+                >
+                  {saving ? 'Opslaan...' : 'Opslaan'}
+                </button>
+              </form>
+            </div>
+
+            <div className="account-setting-item">
+              <h3>Service tijd</h3>
+              <p className="settings-description">
+                De standaard service tijd die wordt gebruikt voor alle stops in route berekeningen.
+              </p>
+              
+              <div className="form-group">
+                <label htmlFor="serviceTime">Service tijd per stop</label>
+                <select
+                  id="serviceTime"
+                  className="service-time-select"
+                  value={serviceTime}
+                  onChange={(e) => setServiceTime(Number(e.target.value))}
+                >
+                  <option value={5}>5 minuten</option>
+                  <option value={10}>10 minuten</option>
+                  <option value={30}>30 minuten</option>
+                </select>
+                <p className="form-hint">Deze tijd wordt automatisch meegenomen in alle route berekeningen en live tracking</p>
+              </div>
+              
+              <button
+                type="button"
+                className="btn-save"
+                onClick={async () => {
+                  setSaving(true);
+                  setMessage('');
+                  
+                  try {
+                    const { data: existing } = await supabase
+                      .from('user_profiles')
+                      .select('id')
+                      .eq('user_id', currentUser.id)
+                      .maybeSingle();
+
+                    const profileData = {
+                      user_id: currentUser.id,
+                      service_time: serviceTime || 5,
+                      updated_at: new Date().toISOString()
+                    };
+
+                    if (existing) {
+                      // Update existing profile
+                      const { error } = await supabase
+                        .from('user_profiles')
+                        .update(profileData)
+                        .eq('user_id', currentUser.id);
+
+                      if (error) throw error;
+                    } else {
+                      // Insert new profile
+                      const { error } = await supabase
+                        .from('user_profiles')
+                        .insert({
+                          ...profileData,
+                          created_at: new Date().toISOString()
+                        });
+
+                      if (error) throw error;
+                    }
+
+                    setMessage('Service tijd opgeslagen!');
+                    setTimeout(() => setMessage(''), 3000);
+                  } catch (error) {
+                    console.error('Error saving service time:', error);
+                    setMessage('Fout bij opslaan service tijd: ' + error.message);
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                disabled={saving}
+              >
+                {saving ? 'Opslaan...' : 'Service tijd opslaan'}
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="settings-section">

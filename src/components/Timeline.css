@@ -372,6 +372,36 @@
   gap: 12px;
 }
 
+.timeline-footer-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.timeline-footer-row .btn-route-calculate {
+  flex: 1;
+}
+
+.btn-reverse-route {
+  padding: 12px 16px;
+  background: #f5f5f5;
+  color: #333;
+  border: none;
+  border-radius: 9999px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-reverse-route:hover {
+  background: #e0e0e0;
+}
+
 .btn-route-calculate {
   width: 100%;
   padding: 12px 24px;

@@ -3,11 +3,19 @@ const cors = require('cors');
 const { Resend } = require('resend');
 const https = require('https');
 const http = require('http');
+const { google } = require('googleapis');
 
 const app = express();
 const PORT = process.env.PORT || 8001;
 const RESEND_API_KEY = process.env.RESEND_API_KEY || 're_iDLLL1LU_NKoUQ1R5oReCnu4AJawE8Sy3';
 const MAPBOX_SECRET_TOKEN = process.env.MAPBOX_SECRET_TOKEN || 'process.env.MAPBOX_SECRET_TOKEN || ""';
+
+// Google Ads Configuration
+const GOOGLE_ADS_CLIENT_ID = process.env.GOOGLE_ADS_CLIENT_ID;
+const GOOGLE_ADS_CLIENT_SECRET = process.env.GOOGLE_ADS_CLIENT_SECRET;
+const GOOGLE_ADS_DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
+const GOOGLE_ADS_CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID;
+const GOOGLE_ADS_REFRESH_TOKEN = process.env.GOOGLE_ADS_REFRESH_TOKEN;
 
 const resend = new Resend(RESEND_API_KEY);
 
@@ -101,27 +109,37 @@ app.post('/api/send-webhook', async (req, res) => {
         customer_address: data.stopAddress || data.address || '',
         route_name: data.routeName || '',
         route_date: data.routeDate || '',
-        route_link: data.routeLink || ''
+        route_link: data.routeLink || '',
+        live_route_link: data.liveRouteLink || data.routeLink || ''
       };
     } else if (templateType === 'klanten-informeren') {
-      payload = {
-        ...payload,
-        event: 'customers_informed',
-        route_name: data.routeName || '',
-        route_date: data.routeDate || '',
-        route_link: data.routeLink || '',
-        stops_count: data.stopsCount || 0,
-        customers: data.customers || []
-      };
-    } else if (templateType === 'route-live-bekijken') {
-      payload = {
-        ...payload,
-        event: 'route_live_view',
-        route_name: data.routeName || '',
-        route_date: data.routeDate || '',
-        route_link: data.routeLink || '',
-        stops_count: data.stopsCount || 0
-      };
+      // Check if this is individual customer data (like klant-aangemeld) or bulk data
+      if (data.stopName || data.name || data.email) {
+        // Individual customer webhook - same structure as klant-aangemeld
+        payload = {
+          ...payload,
+          event: 'customers_informed',
+          customer_name: data.stopName || data.name || '',
+          customer_email: data.email || '',
+          customer_phone: data.phone || '',
+          customer_address: data.stopAddress || data.address || '',
+          route_name: data.routeName || '',
+          route_date: data.routeDate || '',
+          route_link: data.routeLink || '',
+          live_route_link: data.liveRouteLink || data.routeLink || ''
+        };
+      } else {
+        // Bulk webhook with customers array (backwards compatibility)
+        payload = {
+          ...payload,
+          event: 'customers_informed',
+          route_name: data.routeName || '',
+          route_date: data.routeDate || '',
+          route_link: data.routeLink || '',
+          stops_count: data.stopsCount || 0,
+          customers: data.customers || []
+        };
+      }
     } else if (templateType === 'route-gestart') {
       payload = {
         ...payload,
@@ -327,6 +345,142 @@ app.post('/api/optimize-route', async (req, res) => {
     return res.status(500).json({ 
       error: 'Internal server error',
       message: error.message 
+    });
+  }
+});
+
+// ============================================
+// Google Ads API Endpoints
+// ============================================
+
+// Google Ads OAuth2 Authorization Flow
+app.get('/api/google-ads-auth', async (req, res) => {
+  const REDIRECT_URI = process.env.GOOGLE_ADS_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/google-ads-auth`;
+
+  if (!GOOGLE_ADS_CLIENT_ID || !GOOGLE_ADS_CLIENT_SECRET) {
+    return res.status(500).json({
+      error: 'Missing Google OAuth credentials',
+      message: 'Set GOOGLE_ADS_CLIENT_ID and GOOGLE_ADS_CLIENT_SECRET environment variables'
+    });
+  }
+
+  const oauth2Client = new google.auth.OAuth2(
+    GOOGLE_ADS_CLIENT_ID,
+    GOOGLE_ADS_CLIENT_SECRET,
+    REDIRECT_URI
+  );
+
+  const { action, code } = req.query;
+
+  // Step 1: Start OAuth flow
+  if (action === 'authorize') {
+    const authUrl = oauth2Client.generateAuthUrl({
+      access_type: 'offline',
+      prompt: 'consent',
+      scope: ['https://www.googleapis.com/auth/adwords']
+    });
+    return res.redirect(authUrl);
+  }
+
+  // Step 2: Handle callback with authorization code
+  if (code) {
+    try {
+      const { tokens } = await oauth2Client.getToken(code);
+      
+      return res.json({
+        success: true,
+        message: 'OAuth successful! Save the refresh_token below in your environment variables.',
+        refresh_token: tokens.refresh_token,
+        access_token: tokens.access_token,
+        expiry_date: tokens.expiry_date,
+        instructions: 'Add GOOGLE_ADS_REFRESH_TOKEN to your environment variables with the refresh_token value above.'
+      });
+    } catch (error) {
+      console.error('OAuth token exchange error:', error);
+      return res.status(500).json({
+        error: 'Failed to exchange authorization code',
+        message: error.message
+      });
+    }
+  }
+
+  // Default: Show instructions
+  return res.json({
+    message: 'Google Ads OAuth2 Authorization',
+    instructions: 'Visit /api/google-ads-auth?action=authorize to start the OAuth flow',
+    status: 'ready'
+  });
+});
+
+// Google Ads Costs Endpoint
+app.get('/api/google-ads-costs', async (req, res) => {
+  try {
+    // Validate configuration
+    if (!GOOGLE_ADS_CLIENT_ID || !GOOGLE_ADS_CLIENT_SECRET || !GOOGLE_ADS_DEVELOPER_TOKEN || !GOOGLE_ADS_CUSTOMER_ID || !GOOGLE_ADS_REFRESH_TOKEN) {
+      const missing = [];
+      if (!GOOGLE_ADS_CLIENT_ID) missing.push('GOOGLE_ADS_CLIENT_ID');
+      if (!GOOGLE_ADS_CLIENT_SECRET) missing.push('GOOGLE_ADS_CLIENT_SECRET');
+      if (!GOOGLE_ADS_DEVELOPER_TOKEN) missing.push('GOOGLE_ADS_DEVELOPER_TOKEN');
+      if (!GOOGLE_ADS_CUSTOMER_ID) missing.push('GOOGLE_ADS_CUSTOMER_ID');
+      if (!GOOGLE_ADS_REFRESH_TOKEN) missing.push('GOOGLE_ADS_REFRESH_TOKEN');
+      
+      return res.status(500).json({
+        error: 'Missing Google Ads configuration',
+        missing_variables: missing
+      });
+    }
+
+    // Import google-ads-api dynamically (ES module)
+    const { GoogleAdsApi } = await import('google-ads-api');
+
+    // Initialize client
+    const client = new GoogleAdsApi({
+      client_id: GOOGLE_ADS_CLIENT_ID,
+      client_secret: GOOGLE_ADS_CLIENT_SECRET,
+      developer_token: GOOGLE_ADS_DEVELOPER_TOKEN
+    });
+
+    // Get customer instance
+    const customer = client.Customer({
+      customer_id: GOOGLE_ADS_CUSTOMER_ID.replace(/-/g, ''),
+      refresh_token: GOOGLE_ADS_REFRESH_TOKEN
+    });
+
+    // Query for costs
+    const query = `
+      SELECT
+        segments.date,
+        metrics.cost_micros
+      FROM customer
+      WHERE segments.date DURING LAST_30_DAYS
+      ORDER BY segments.date DESC
+    `;
+
+    const results = await customer.query(query);
+
+    // Transform results
+    const costs = results.map(row => ({
+      date: row.segments.date,
+      cost: (row.metrics.cost_micros / 1000000).toFixed(2)
+    }));
+
+    // Calculate total
+    const totalCost = costs.reduce((sum, row) => sum + parseFloat(row.cost), 0);
+
+    return res.json({
+      success: true,
+      period: 'LAST_30_DAYS',
+      total_cost: totalCost.toFixed(2),
+      currency: 'EUR',
+      daily_costs: costs
+    });
+
+  } catch (error) {
+    console.error('Google Ads API error:', error);
+    return res.status(500).json({
+      error: 'Failed to fetch Google Ads costs',
+      message: error.message,
+      details: error.errors || null
     });
   }
 });

@@ -22,6 +22,7 @@ function Map({
   const markers = useRef([]);
   const startMarker = useRef(null);
   const routeLayers = useRef([]); // Array voor meerdere route layers
+  const previousRouteRef = useRef(null); // Track previous route to detect changes
 
   useEffect(() => {
     if (map.current) return; // Initialize map only once
@@ -173,6 +174,30 @@ function Map({
       return;
     }
 
+    // Check if route actually changed by comparing geometry coordinates
+    const routeChanged = !previousRouteRef.current || 
+      !route || 
+      !previousRouteRef.current.geometry || 
+      !route.geometry ||
+      JSON.stringify(previousRouteRef.current.geometry.coordinates) !== JSON.stringify(route.geometry.coordinates) ||
+      previousRouteRef.current.distance !== route.distance;
+
+    if (!routeChanged && route) {
+      console.log('Route unchanged, skipping update');
+      return;
+    }
+
+    // Update previous route reference
+    if (route && route.geometry) {
+      previousRouteRef.current = {
+        geometry: route.geometry,
+        distance: route.distance,
+        duration: route.duration
+      };
+    } else {
+      previousRouteRef.current = null;
+    }
+
     console.log('Map route effect triggered', { 
       route: route ? { 
         hasGeometry: !!route.geometry, 
@@ -180,7 +205,8 @@ function Map({
         coordinatesCount: route.geometry?.coordinates?.length,
         geometryType: route.geometry?.type
       } : null, 
-      routes: routes?.length
+      routes: routes?.length,
+      routeChanged
     });
 
     const removeAllRoutes = () => {
@@ -414,15 +440,14 @@ function Map({
     
     tryAddRoutes();
 
-    // Cleanup function
+    // Cleanup function - only remove routes if component unmounts, not on every update
     return () => {
-      if (map.current) {
-        removeAllRoutes();
-      }
+      // Don't remove routes on every update, only on unmount
+      // Routes will be updated by addRoutes() which removes old ones first
     };
   }, [
     routes, 
-    route, // Keep route in dependencies but use JSON.stringify for deep comparison
+    route, 
     routeColors
   ]);
 

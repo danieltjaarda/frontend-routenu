@@ -10,11 +10,17 @@
   flex: 1;
   margin-left: 70px;
   width: calc(100% - 70px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .content-wrapper.full-width {
   margin-left: 0;
   width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .content-wrapper > .map-container {

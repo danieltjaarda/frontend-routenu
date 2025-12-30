@@ -35,9 +35,8 @@ const EmailIcon = () => (
 );
 
 const TEMPLATES = [
-  { id: 'klanten-informeren', name: 'Klanten informeren', description: 'Informeer klanten dat ze zijn aangemeld voor de route' },
   { id: 'klant-aangemeld', name: 'Klant aangemeld', description: 'Verzend bevestiging wanneer een nieuwe stop met e-mail wordt toegevoegd' },
-  { id: 'route-live-bekijken', name: 'Route live bekijken', description: 'Klanten kunnen live de route voortgang volgen' },
+  { id: 'klanten-informeren', name: 'Klanten informeren', description: 'Informeer klanten dat ze zijn aangemeld voor de route' },
   { id: 'route-gestart', name: 'Route gestart', description: 'Informeer klanten dat de route is gestart' }
 ];
 
@@ -82,7 +81,8 @@ function EmailConfigurator() {
         })
       : 'vandaag';
     const stopsCount = route?.stops?.length || 0;
-    const routeLink = route?.id ? `https://routenu.nl/route/${route.id}` : '#';
+    const stopsText = `${stopsCount} stop${stopsCount !== 1 ? 's' : ''}`;
+    const routeLink = route?.id ? `https://app.routenu.nl/route/${route.id}` : '#';
 
     const templates = {
       'klanten-informeren': `<!DOCTYPE html>
@@ -130,65 +130,16 @@ function EmailConfigurator() {
 </head>
 <body>
   <div class="header">
-    <h1>RouteNu</h1>
+    <h1>Routenu.nl</h1>
   </div>
   <div class="content">
     <h2>Beste klant,</h2>
-    <p>U bent aangemeld voor de route <strong>${routeName}</strong> op ${routeDate}.</p>
+    <p>U bent aangemeld voor de route <strong>\${routeName}</strong> op \${routeDate}.</p>
     <div class="time-info">
       <p><strong>Verwachte aankomsttijd:</strong> \${stopTimeRange}</p>
     </div>
     <p>Meer informatie ontvangt u op de dag zelf van de route.</p>
-    <a href="${routeLink}" class="button">Bekijk route</a>
-  </div>
-</body>
-</html>`,
-
-      'route-live-bekijken': `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      line-height: 1.6;
-      color: #333;
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    .header {
-      background: #0CC0DF;
-      color: white;
-      padding: 20px;
-      text-align: center;
-      border-radius: 8px 8px 0 0;
-    }
-    .content {
-      background: #f9f9f9;
-      padding: 20px;
-      border-radius: 0 0 8px 8px;
-    }
-    .button {
-      display: inline-block;
-      background: #0CC0DF;
-      color: white;
-      padding: 12px 24px;
-      text-decoration: none;
-      border-radius: 9999px;
-      margin-top: 20px;
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>RouteNu</h1>
-  </div>
-  <div class="content">
-    <h2>Beste klant,</h2>
-    <p>U kunt nu live de voortgang van route <strong>${routeName}</strong> voor ${routeDate} volgen.</p>
-    <p>De route bevat ${stopsCount} stop${stopsCount !== 1 ? 's' : ''} en is nu actief.</p>
-    <a href="${routeLink}" class="button">Route live bekijken</a>
+    <a href="\${liveRouteLink}" class="button">Bekijk route</a>
   </div>
 </body>
 </html>`,
@@ -231,13 +182,13 @@ function EmailConfigurator() {
 </head>
 <body>
   <div class="header">
-    <h1>RouteNu</h1>
+    <h1>Routenu.nl</h1>
   </div>
   <div class="content">
     <h2>Beste klant,</h2>
-    <p>Route <strong>${routeName}</strong> voor ${routeDate} is gestart!</p>
-    <p>De route bevat ${stopsCount} stop${stopsCount !== 1 ? 's' : ''} en wordt nu uitgevoerd.</p>
-    <a href="${routeLink}" class="button">Volg route</a>
+    <p>Route <strong>\${routeName}</strong> voor \${routeDate} is gestart!</p>
+    <p>De route bevat \${stopsText} en wordt nu uitgevoerd.</p>
+    <a href="\${liveRouteLink}" class="button">Volg route</a>
   </div>
 </body>
 </html>`,
@@ -286,7 +237,7 @@ function EmailConfigurator() {
 </head>
 <body>
   <div class="header">
-    <h1>RouteNu</h1>
+    <h1>Routenu.nl</h1>
   </div>
   <div class="content">
     <h2>Beste \${stopName},</h2>
@@ -296,7 +247,7 @@ function EmailConfigurator() {
       <p>\${stopAddress}</p>
     </div>
     <p>U ontvangt verdere informatie zodra de route is berekend en geoptimaliseerd.</p>
-    <a href="\${routeLink}" class="button">Bekijk route</a>
+    <a href="\${liveRouteLink}" class="button">Bekijk route</a>
   </div>
 </body>
 </html>`
@@ -330,13 +281,16 @@ function EmailConfigurator() {
               </tr>
             </thead>
             <tbody>
-              {TEMPLATES.map((template) => (
+              {TEMPLATES.map((template, index) => (
                 <tr 
                   key={template.id} 
                   className="route-row"
                   onClick={() => handleTemplateClick(template)}
                 >
-                  <td className="route-name">{template.name}</td>
+                  <td className="route-name">
+                    <span className="template-number">{index + 1}</span>
+                    {template.name}
+                  </td>
                   <td>{template.description}</td>
                 </tr>
               ))}
@@ -411,7 +365,8 @@ function EmailEditor({ template, routes, selectedRoute, onRouteChange, onClose }
         })
       : 'vandaag';
     const stopsCount = route?.stops?.length || 0;
-    const routeLink = route?.id ? `https://routenu.nl/route/${route.id}` : '#';
+    const stopsText = `${stopsCount} stop${stopsCount !== 1 ? 's' : ''}`;
+    const routeLink = route?.id ? `https://app.routenu.nl/route/${route.id}` : '#';
 
     const templates = {
       'klanten-informeren': `<!DOCTYPE html>
@@ -459,65 +414,16 @@ function EmailEditor({ template, routes, selectedRoute, onRouteChange, onClose }
 </head>
 <body>
   <div class="header">
-    <h1>RouteNu</h1>
+    <h1>Routenu.nl</h1>
   </div>
   <div class="content">
     <h2>Beste klant,</h2>
-    <p>U bent aangemeld voor de route <strong>${routeName}</strong> op ${routeDate}.</p>
+    <p>U bent aangemeld voor de route <strong>\${routeName}</strong> op \${routeDate}.</p>
     <div class="time-info">
       <p><strong>Verwachte aankomsttijd:</strong> \${stopTimeRange}</p>
     </div>
     <p>Meer informatie ontvangt u op de dag zelf van de route.</p>
-    <a href="${routeLink}" class="button">Bekijk route</a>
-  </div>
-</body>
-</html>`,
-
-      'route-live-bekijken': `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      line-height: 1.6;
-      color: #333;
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    .header {
-      background: #0CC0DF;
-      color: white;
-      padding: 20px;
-      text-align: center;
-      border-radius: 8px 8px 0 0;
-    }
-    .content {
-      background: #f9f9f9;
-      padding: 20px;
-      border-radius: 0 0 8px 8px;
-    }
-    .button {
-      display: inline-block;
-      background: #0CC0DF;
-      color: white;
-      padding: 12px 24px;
-      text-decoration: none;
-      border-radius: 9999px;
-      margin-top: 20px;
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>RouteNu</h1>
-  </div>
-  <div class="content">
-    <h2>Beste klant,</h2>
-    <p>U kunt nu live de voortgang van route <strong>${routeName}</strong> voor ${routeDate} volgen.</p>
-    <p>De route bevat ${stopsCount} stop${stopsCount !== 1 ? 's' : ''} en is nu actief.</p>
-    <a href="${routeLink}" class="button">Route live bekijken</a>
+    <a href="\${liveRouteLink}" class="button">Bekijk route</a>
   </div>
 </body>
 </html>`,
@@ -560,13 +466,72 @@ function EmailEditor({ template, routes, selectedRoute, onRouteChange, onClose }
 </head>
 <body>
   <div class="header">
-    <h1>RouteNu</h1>
+    <h1>Routenu.nl</h1>
   </div>
   <div class="content">
     <h2>Beste klant,</h2>
-    <p>Route <strong>${routeName}</strong> voor ${routeDate} is gestart!</p>
-    <p>De route bevat ${stopsCount} stop${stopsCount !== 1 ? 's' : ''} en wordt nu uitgevoerd.</p>
-    <a href="${routeLink}" class="button">Volg route</a>
+    <p>Route <strong>\${routeName}</strong> voor \${routeDate} is gestart!</p>
+    <p>De route bevat \${stopsText} en wordt nu uitgevoerd.</p>
+    <a href="\${liveRouteLink}" class="button">Volg route</a>
+  </div>
+</body>
+</html>`,
+
+      'klant-aangemeld': `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      background: #0CC0DF;
+      color: white;
+      padding: 20px;
+      text-align: center;
+      border-radius: 8px 8px 0 0;
+    }
+    .content {
+      background: #f9f9f9;
+      padding: 20px;
+      border-radius: 0 0 8px 8px;
+    }
+    .button {
+      display: inline-block;
+      background: #0CC0DF;
+      color: white;
+      padding: 12px 24px;
+      text-decoration: none;
+      border-radius: 9999px;
+      margin-top: 20px;
+    }
+    .info-box {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 15px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Routenu.nl</h1>
+  </div>
+  <div class="content">
+    <h2>Beste \${stopName},</h2>
+    <p>De route <strong>\${routeName}</strong> is aangemaakt en u bent aangemeld voor deze route op <strong>\${routeDate}</strong>.</p>
+    <div class="info-box">
+      <p><strong>Uw stop:</strong></p>
+      <p>\${stopAddress}</p>
+    </div>
+    <p>U ontvangt verdere informatie zodra de route is berekend en geoptimaliseerd.</p>
+    <a href="\${liveRouteLink}" class="button">Bekijk route</a>
   </div>
 </body>
 </html>`
@@ -595,21 +560,23 @@ function EmailEditor({ template, routes, selectedRoute, onRouteChange, onClose }
           year: 'numeric' 
         });
     const stopsCount = selectedRouteData?.stops?.length || 5;
+    const stopsText = `${stopsCount} stop${stopsCount !== 1 ? 's' : ''}`;
     const routeLink = selectedRouteData?.id 
-      ? `https://routenu.nl/route/${selectedRouteData.id}` 
-      : 'https://routenu.nl/route/12345';
+      ? `https://app.routenu.nl/route/${selectedRouteData.id}` 
+      : 'https://app.routenu.nl/route/12345';
 
     const stopName = 'Jan Jansen'; // Mock data voor preview
     const stopAddress = 'Hoofdstraat 123, Amsterdam, Netherlands'; // Mock data voor preview
     const stopTimeRange = '09:30 - 09:35'; // Mock data voor preview
     const liveRouteLink = selectedRouteData?.id 
-      ? `https://routenu.nl/route/${selectedRouteData.id}/TOKEN/email@example.com`
-      : 'https://routenu.nl/route/12345/TOKEN/email@example.com';
+      ? `https://app.routenu.nl/route/${selectedRouteData.id}/TOKEN/email@example.com`
+      : 'https://app.routenu.nl/route/12345/TOKEN/email@example.com';
 
     return htmlContent
       .replace(/\$\{routeName\}/g, routeName)
       .replace(/\$\{routeDate\}/g, routeDate)
       .replace(/\$\{stopsCount\}/g, stopsCount.toString())
+      .replace(/\$\{stopsText\}/g, stopsText)
       .replace(/\$\{routeLink\}/g, routeLink)
       .replace(/\$\{liveRouteLink\}/g, liveRouteLink)
       .replace(/\$\{stopName\}/g, stopName)
@@ -670,6 +637,27 @@ function EmailEditor({ template, routes, selectedRoute, onRouteChange, onClose }
     loadSavedTemplate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id, template?.id, selectedRoute]);
+
+  const handleResetTemplate = () => {
+    if (!template || !template.id) return;
+    
+    if (selectedRouteData) {
+      const defaultContent = getTemplateContent(template.id, selectedRouteData);
+      setHtmlContent(defaultContent);
+      
+      // Reset subject to default based on template type
+      const defaultSubjects = {
+        'klant-aangemeld': `Welkom bij RouteNu - U bent toegevoegd aan route \${routeName}`,
+        'klanten-informeren': `U bent aangemeld voor route \${routeName}`,
+        'route-gestart': `Route \${routeName} is gestart!`
+      };
+      
+      setEmailData(prev => ({
+        ...prev,
+        subject: defaultSubjects[template.id] || prev.subject
+      }));
+    }
+  };
 
   const handleSaveTemplate = async () => {
     // Validatie
@@ -771,14 +759,16 @@ function EmailEditor({ template, routes, selectedRoute, onRouteChange, onClose }
         })
       : 'vandaag';
     const stopsCount = selectedRouteData.stops?.length || 0;
-    const routeLink = selectedRouteData.id ? `https://routenu.nl/route/${selectedRouteData.id}` : '#';
+    const stopsText = `${stopsCount} stop${stopsCount !== 1 ? 's' : ''}`;
+    const routeLink = selectedRouteData.id ? `https://app.routenu.nl/route/${selectedRouteData.id}` : '#';
     // For preview, use a mock live route link (will be replaced with personal link when route starts)
-    const liveRouteLink = selectedRouteData.id ? `https://routenu.nl/route/${selectedRouteData.id}/TOKEN/email@example.com` : '#';
+    const liveRouteLink = selectedRouteData.id ? `https://app.routenu.nl/route/${selectedRouteData.id}/TOKEN/email@example.com` : '#';
 
     return content
       .replace(/\$\{routeName\}/g, routeName)
       .replace(/\$\{routeDate\}/g, routeDate)
       .replace(/\$\{stopsCount\}/g, stopsCount.toString())
+      .replace(/\$\{stopsText\}/g, stopsText)
       .replace(/\$\{routeLink\}/g, routeLink)
       .replace(/\$\{liveRouteLink\}/g, liveRouteLink)
       .replace(/\$\{stopName\}/g, '') // Wordt vervangen door echte data bij verzenden
@@ -1040,6 +1030,14 @@ function EmailEditor({ template, routes, selectedRoute, onRouteChange, onClose }
               )}
 
               <div className="form-actions">
+                <button
+                  className="btn-reset"
+                  onClick={handleResetTemplate}
+                  disabled={!selectedRouteData || !template}
+                  title="Herstel template naar standaard"
+                >
+                  ↻ Template herstellen
+                </button>
                 <button
                   className="btn-save"
                   onClick={handleSaveTemplate}

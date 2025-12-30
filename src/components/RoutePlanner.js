@@ -36,7 +36,8 @@ function RoutePlanner({
   selectedDriver,
   onDriverChange,
   vehicles,
-  allOrders
+  allOrders,
+  drivers: driversProp
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -69,19 +70,39 @@ function RoutePlanner({
     });
   };
 
-  // Haal unieke chauffeurs op uit vehicles
-  // Check zowel Nederlandse (form) als Engelse (database) veldnamen
+  // Haal unieke chauffeurs op - prefer drivers prop, fallback to vehicles
+  // Filter out UUIDs - only show actual driver names
   const drivers = React.useMemo(() => {
+    // If drivers prop is provided (array of driver objects), use those
+    if (driversProp && Array.isArray(driversProp) && driversProp.length > 0) {
+      // Extract names from driver objects
+      return driversProp
+        .map(driver => typeof driver === 'object' ? driver.name : driver)
+        .filter(name => name && name.trim())
+        .filter(name => {
+          // Filter out UUIDs
+          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(name.trim());
+          return !isUUID;
+        })
+        .sort();
+    }
+    
+    // Fallback: haal unieke chauffeurs op uit vehicles
     const uniqueDrivers = new Set();
     vehicles.forEach(vehicle => {
       // Check Nederlandse veldnaam (van form) en Engelse (van database)
       const driver = vehicle.chauffeur || vehicle.driver;
       if (driver && driver.trim()) {
-        uniqueDrivers.add(driver.trim());
+        // Check if it's a UUID (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(driver.trim());
+        // Only add if it's NOT a UUID (i.e., it's a name)
+        if (!isUUID) {
+          uniqueDrivers.add(driver.trim());
+        }
       }
     });
     return Array.from(uniqueDrivers).sort();
-  }, [vehicles]);
+  }, [vehicles, driversProp]);
 
   const formatDuration = (seconds) => {
     const hours = Math.floor(seconds / 3600);
@@ -112,9 +133,16 @@ function RoutePlanner({
           required
         >
           <option value="">Selecteer een chauffeur</option>
-          {drivers.map((driver, index) => (
-            <option key={index} value={driver}>{driver}</option>
-          ))}
+          {drivers.map((driver, index) => {
+            // Handle both object format {id, name} and string format
+            const driverName = typeof driver === 'object' ? driver.name : driver;
+            const driverValue = typeof driver === 'object' ? driver.name : driver;
+            return (
+              <option key={driver?.id || index} value={driverValue}>
+                {driverName}
+              </option>
+            );
+          })}
         </select>
         {drivers.length === 0 && (
           <p className="driver-hint">Voeg eerst een voertuig toe via het menu</p>

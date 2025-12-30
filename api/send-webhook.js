@@ -51,24 +51,32 @@ module.exports = async (req, res) => {
         route_link: data.routeLink || ''
       };
     } else if (templateType === 'klanten-informeren') {
-      payload = {
-        ...payload,
-        event: 'customers_informed',
-        route_name: data.routeName || '',
-        route_date: data.routeDate || '',
-        route_link: data.routeLink || '',
-        stops_count: data.stopsCount || 0,
-        customers: data.customers || []
-      };
-    } else if (templateType === 'route-live-bekijken') {
-      payload = {
-        ...payload,
-        event: 'route_live_view',
-        route_name: data.routeName || '',
-        route_date: data.routeDate || '',
-        route_link: data.routeLink || '',
-        stops_count: data.stopsCount || 0
-      };
+      // Check if this is individual customer data (like klant-aangemeld) or bulk data
+      if (data.stopName || data.name || data.email) {
+        // Individual customer webhook - same structure as klant-aangemeld
+        payload = {
+          ...payload,
+          event: 'customers_informed',
+          customer_name: data.stopName || data.name || '',
+          customer_email: data.email || '',
+          customer_phone: data.phone || '',
+          customer_address: data.stopAddress || data.address || '',
+          route_name: data.routeName || '',
+          route_date: data.routeDate || '',
+          route_link: data.routeLink || ''
+        };
+      } else {
+        // Bulk webhook with customers array (backwards compatibility)
+        payload = {
+          ...payload,
+          event: 'customers_informed',
+          route_name: data.routeName || '',
+          route_date: data.routeDate || '',
+          route_link: data.routeLink || '',
+          stops_count: data.stopsCount || 0,
+          customers: data.customers || []
+        };
+      }
     } else if (templateType === 'route-gestart') {
       payload = {
         ...payload,

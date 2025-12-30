@@ -26,7 +26,7 @@ const EditIcon = () => (
   </svg>
 );
 
-function Timeline({ stops, route, onRemoveStop, onReorderStops, startAddress, onEditStop, onCalculateRoute, onOptimizeRoute, isOptimizing, departureTime, onDepartureTimeChange, currentRouteId, routeName, routeDate, vehicles = [], drivers = [] }) {
+function Timeline({ stops, route, onRemoveStop, onReorderStops, onReverseRoute, startAddress, onEditStop, onCalculateRoute, onOptimizeRoute, isOptimizing, departureTime, onDepartureTimeChange, serviceTime, currentRouteId, routeName, routeDate, vehicles = [], drivers = [] }) {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [draggedIndex, setDraggedIndex] = useState(null);
@@ -41,6 +41,7 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, startAddress, on
   React.useEffect(() => {
     setTempDepartureTime(departureTime || '08:00');
   }, [departureTime]);
+
 
   // Load customers_informed_at timestamp when route changes
   useEffect(() => {
@@ -106,7 +107,9 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, startAddress, on
         cumulativeDuration += segmentDuration;
         
         const arrivalTime = new Date(startTime.getTime() + (cumulativeDuration * 1000));
-        const departureTime = new Date(arrivalTime.getTime() + (5 * 60 * 1000)); // 5 minuten per stop
+        // Gebruik algemene service tijd voor alle stops
+        const serviceTimeMinutes = serviceTime || 5;
+        const departureTime = new Date(arrivalTime.getTime() + (serviceTimeMinutes * 60 * 1000));
         
         times.push({
           arrival: formatTime(arrivalTime),
@@ -126,7 +129,9 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, startAddress, on
       
       stops.forEach((stop, index) => {
         const arrivalTime = new Date(startTime.getTime() + (durationPerStop * (index + 1) * 1000));
-        const departureTime = new Date(arrivalTime.getTime() + (5 * 60 * 1000));
+        // Gebruik service tijd uit user profile (via prop)
+        const serviceTimeMinutes = serviceTime || 5;
+        const departureTime = new Date(arrivalTime.getTime() + (serviceTimeMinutes * 60 * 1000));
         
         times.push({
           arrival: formatTime(arrivalTime),
@@ -234,10 +239,10 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, startAddress, on
             })
           : 'vandaag';
         const stopsCount = stops.length;
-        const routeLink = currentRouteId ? `https://routenu.nl/route/${currentRouteId}` : '#';
+        const routeLink = currentRouteId ? `https://app.routenu.nl/route/${currentRouteId}` : '#';
         
         savedTemplate = {
-          subject: `U bent aangemeld voor route ${routeNameForTemplate}`,
+          subject: `U bent aangemeld voor route \${routeName}`,
           html_content: `<!DOCTYPE html>
 <html>
 <head>
@@ -283,21 +288,52 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, startAddress, on
 </head>
 <body>
   <div class="header">
-    <h1>RouteNu</h1>
+    <h1>Routenu.nl</h1>
   </div>
   <div class="content">
     <h2>Beste klant,</h2>
-    <p>U bent aangemeld voor de route <strong>${routeNameForTemplate}</strong> op ${routeDateForTemplate}.</p>
+    <p>U bent aangemeld voor de route <strong>\${routeName}</strong> op \${routeDate}.</p>
     <div class="time-info">
       <p><strong>Verwachte aankomsttijd:</strong> \${stopTimeRange}</p>
     </div>
     <p>Meer informatie ontvangt u op de dag zelf van de route.</p>
-    <a href="${routeLink}" class="button">Bekijk route</a>
+    <a href="\${liveRouteLink}" class="button">Bekijk route</a>
   </div>
 </body>
 </html>`,
           from_email: 'noreply@routenu.nl'
         };
+      }
+
+      // Haal of genereer token voor deze route (altijd een token hebben)
+      let liveRouteToken = null;
+      if (currentRouteId) {
+        try {
+          const { data: routeData } = await supabase
+            .from('routes')
+            .select('live_route_token, route_status')
+            .eq('id', currentRouteId)
+            .eq('user_id', currentUser.id)
+            .maybeSingle();
+          
+          if (routeData?.live_route_token) {
+            liveRouteToken = routeData.live_route_token;
+            console.log('✓ Found live_route_token for route:', liveRouteToken);
+          } else {
+            // Genereer nieuwe token en sla op
+            liveRouteToken = `${currentRouteId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+            await supabase
+              .from('routes')
+              .update({ live_route_token: liveRouteToken })
+              .eq('id', currentRouteId)
+              .eq('user_id', currentUser.id);
+            console.log('✓ Generated and saved new live_route_token for route:', currentRouteId);
+          }
+        } catch (error) {
+          console.error('Error getting/generating token:', error);
+          // Genereer token lokaal als fallback (wordt niet opgeslagen)
+          liveRouteToken = `${currentRouteId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        }
       }
 
       // Bereid route data voor template variabelen
@@ -310,10 +346,7 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, startAddress, on
           })
         : 'vandaag';
       const stopsCount = stops.length;
-      const routeLink = currentRouteId ? `https://routenu.nl/route/${currentRouteId}` : '#';
-      // For "klanten-informeren", liveRouteLink is not available yet (route not started)
-      // But we include it for consistency - it will be replaced with routeLink
-      const liveRouteLink = routeLink;
+      const baseRouteLink = currentRouteId ? `https://app.routenu.nl/route/${currentRouteId}` : '#';
 
       // Vervang template variabelen
       // Check if html_content exists and is a string
@@ -357,6 +390,23 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, startAddress, on
           // Bereken tijdstippen voor deze specifieke stop
           const stopTimeRange = getStopTimeRange(stopIndex);
           
+          // Genereer persoonlijke link met token en email (altijd)
+          const encodedEmail = encodeURIComponent(email.trim().toLowerCase());
+          let personalRouteLink;
+          if (currentRouteId && liveRouteToken && encodedEmail) {
+            // Altijd token + email gebruiken
+            personalRouteLink = `https://app.routenu.nl/route/${currentRouteId}/${liveRouteToken}/${encodedEmail}`;
+          } else if (currentRouteId) {
+            // Fallback: alleen route ID als token/email ontbreekt
+            personalRouteLink = `https://app.routenu.nl/route/${currentRouteId}`;
+          } else {
+            personalRouteLink = baseRouteLink;
+          }
+          const routeLink = personalRouteLink; // Use personal link for routeLink too
+          const liveRouteLink = personalRouteLink; // Use personal link for liveRouteLink
+          
+          console.log('✓ Generated personal link for email', email, ':', personalRouteLink);
+          
           // Make a copy of the HTML content to avoid mutating the original
           let htmlContent = String(savedTemplate.html_content);
           
@@ -384,19 +434,65 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, startAddress, on
           
           console.log('Sending email to:', email, 'with payload size:', JSON.stringify(emailPayload).length);
           
-          const response = await fetch(`${API_BASE_URL}/api/send-email`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(emailPayload)
-          });
+          // Verstuur e-mail
+          let emailSent = false;
+          try {
+            const response = await fetch(`${API_BASE_URL}/api/send-email`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(emailPayload)
+            });
 
-          const data = await response.json();
-          if (!response.ok) {
-            throw new Error(data.error || 'E-mail verzenden mislukt');
+            const data = await response.json();
+            if (!response.ok) {
+              throw new Error(data.error || 'E-mail verzenden mislukt');
+            }
+            emailSent = true;
+            console.log(`✅ Email sent successfully to ${email}`);
+          } catch (emailError) {
+            console.error(`❌ Error sending email to ${email}:`, emailError);
+            // Continue to send webhook even if email fails
           }
-          return { email, success: true };
+          
+          // Verstuur webhook ALTIJD (ook als e-mail faalt) als webhook URL bestaat
+          if (savedTemplate?.webhook_url && savedTemplate.webhook_url.trim() && stopForEmail) {
+            console.log(`🚀 Sending webhook for klanten-informeren to ${email}:`, {
+              webhookUrl: savedTemplate.webhook_url,
+              hasWebhookUrl: !!savedTemplate.webhook_url,
+              webhookUrlLength: savedTemplate.webhook_url.length,
+              emailSent: emailSent
+            });
+            
+            try {
+              await sendWebhook(savedTemplate.webhook_url, 'klanten-informeren', {
+                stopName: stopForEmail.name || '',
+                name: stopForEmail.name || '',
+                email: stopForEmail.email || '',
+                phone: stopForEmail.phone || '',
+                stopAddress: stopForEmail.address || '',
+                address: stopForEmail.address || '',
+                routeName: routeNameForTemplate,
+                routeDate: routeDateForTemplate,
+                routeLink: personalRouteLink,
+                liveRouteLink: personalRouteLink
+              });
+              console.log(`✅ Webhook sent successfully for ${email}`);
+            } catch (webhookError) {
+              console.error(`❌ Error sending webhook for ${email}:`, webhookError);
+              // Don't fail the email send if webhook fails
+            }
+          } else {
+            console.log(`⚠️ No webhook URL configured for klanten-informeren template for ${email}:`, {
+              hasSavedTemplate: !!savedTemplate,
+              webhookUrl: savedTemplate?.webhook_url,
+              webhookUrlType: typeof savedTemplate?.webhook_url,
+              hasStopForEmail: !!stopForEmail
+            });
+          }
+          
+          return { email, success: emailSent };
         } catch (error) {
           console.error(`Error sending email to ${email}:`, error);
           return { email, success: false, error: error.message };
@@ -426,37 +522,6 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, startAddress, on
           } catch (updateError) {
             console.error('Error updating customers_informed_at:', updateError);
           }
-        }
-
-        // Verstuur webhook als e-mails succesvol zijn verzonden en webhook URL bestaat
-        if (savedTemplate?.webhook_url) {
-          const routeNameForTemplate = routeName || 'Route';
-          const routeDateForTemplate = routeDate 
-            ? new Date(routeDate).toLocaleDateString('nl-NL', { 
-                day: 'numeric', 
-                month: 'long', 
-                year: 'numeric' 
-              })
-            : 'vandaag';
-          const routeLink = currentRouteId ? `https://routenu.nl/route/${currentRouteId}` : '#';
-          
-          // Verzamel klantgegevens van stops met email
-          const customers = stops
-            .filter(stop => stop.email && stop.email.trim())
-            .map(stop => ({
-              name: stop.name || '',
-              email: stop.email || '',
-              phone: stop.phone || '',
-              address: stop.address || ''
-            }));
-
-          await sendWebhook(savedTemplate.webhook_url, 'klanten-informeren', {
-            routeName: routeNameForTemplate,
-            routeDate: routeDateForTemplate,
-            routeLink: routeLink,
-            stopsCount: stops.length,
-            customers: customers
-          });
         }
 
         alert(`Alle e-mails succesvol verzonden naar ${successful} klant(en)!`);
@@ -490,6 +555,15 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, startAddress, on
             </span>
           </div>
           <div className="vehicle-actions">
+            {onReverseRoute && stops.length >= 2 && (
+              <button 
+                className="icon-button" 
+                onClick={onReverseRoute}
+                title="Route omdraaien"
+              >
+                🔄
+              </button>
+            )}
             <button 
               className="icon-button" 
               onClick={() => {
@@ -629,6 +703,12 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, startAddress, on
                 <span className="stat-label-timeline">Tijd:</span>
                 <span className="stat-value-timeline">{formatDurationShort(route.duration)}</span>
               </div>
+              {stops.length > 0 && serviceTime && (
+                <div className="stat-timeline">
+                  <span className="stat-label-timeline">Totale service tijd:</span>
+                  <span className="stat-value-timeline">{stops.length * serviceTime} min</span>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -643,6 +723,7 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, startAddress, on
       {/* Route berekenen button */}
       {stops.length > 0 && (
         <div className="timeline-footer">
+          <div className="timeline-footer-row">
           <button 
             className="btn-route-calculate"
             onClick={() => setShowRouteModal(true)}
@@ -650,6 +731,16 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, startAddress, on
           >
             Route berekenen
           </button>
+            {onReverseRoute && stops.length >= 2 && (
+              <button 
+                className="btn-reverse-route"
+                onClick={onReverseRoute}
+                title="Route omdraaien"
+              >
+                🔄 Omdraaien
+              </button>
+            )}
+          </div>
           <button 
             className="btn-inform-customers"
             onClick={handleInformCustomers}
@@ -791,6 +882,7 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, startAddress, on
           </div>
         </div>
       )}
+
     </div>
   );
 }

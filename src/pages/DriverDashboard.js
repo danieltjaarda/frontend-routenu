@@ -2,9 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { getEmailTemplate, sendWebhook, getRouteStopTimestamps, recalculateArrivalTimes } from '../services/userData';
+import Map from '../components/Map';
 import './DriverDashboard.css';
 
+const MAPBOX_PUBLIC_TOKEN = process.env.REACT_APP_MAPBOX_PUBLIC_TOKEN || 'pk.eyJ1IjoiZmF0YmlrZWh1bHAiLCJhIjoiY21qNnhmanp5MDB4ajNncjB1YXJrMDc2cSJ9.5CYl4ZfCROi-pmyaNzETIg';
+
 const API_BASE_URL = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8001');
+const FRONTEND_BASE_URL = process.env.REACT_APP_FRONTEND_URL || (process.env.NODE_ENV === 'production' ? 'https://app.routenu.nl' : window.location.origin);
 
 function DriverDashboard() {
   const { currentUser, logout } = useAuth();
@@ -52,9 +56,12 @@ function DriverDashboard() {
           setDriver(driverData);
 
           // Load routes assigned to this driver (vandaag en toekomstig)
+          // Use local date to avoid timezone issues
           const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const todayStr = today.toISOString().split('T')[0];
+          const year = today.getFullYear();
+          const month = String(today.getMonth() + 1).padStart(2, '0');
+          const day = String(today.getDate()).padStart(2, '0');
+          const todayStr = `${year}-${month}-${day}`; // Format: YYYY-MM-DD (local time)
 
           const { data: routesData, error: routesError } = await supabase
             .from('routes')
@@ -252,7 +259,7 @@ function DriverDashboard() {
           })
         : 'vandaag';
       // Create general route link for webhooks (not personalized)
-      const generalRouteLink = `${window.location.origin}/route/${route.id}/${liveRouteToken}`;
+      const generalRouteLink = `${FRONTEND_BASE_URL}/route/${route.id}/${liveRouteToken}`;
       const stopsCount = route.stops.length;
       
       // Always fetch template to check for webhook, even if no emails will be sent
@@ -326,14 +333,14 @@ function DriverDashboard() {
 </head>
 <body>
   <div class="header">
-    <h1>RouteNu</h1>
+    <h1>Routenu.nl</h1>
   </div>
   <div class="content">
     <h2>Beste klant,</h2>
     <p>Route <strong>\${routeName}</strong> voor \${routeDate} is gestart!</p>
-    <p>De route bevat \${stopsCount} stop\${stopsCount !== 1 ? 's' : ''} en wordt nu uitgevoerd.</p>
+    <p>De route bevat \${stopsText} en wordt nu uitgevoerd.</p>
     <p>U kunt de route live volgen via onderstaande link:</p>
-    <a href="\${routeLink}" class="button">Route live bekijken</a>
+    <a href="\${liveRouteLink}" class="button">Route live bekijken</a>
   </div>
 </body>
 </html>`
@@ -383,14 +390,14 @@ function DriverDashboard() {
 </head>
 <body>
   <div class="header">
-    <h1>RouteNu</h1>
+    <h1>Routenu.nl</h1>
   </div>
   <div class="content">
     <h2>Beste klant,</h2>
     <p>Route <strong>\${routeName}</strong> voor \${routeDate} is gestart!</p>
-    <p>De route bevat \${stopsCount} stop\${stopsCount !== 1 ? 's' : ''} en wordt nu uitgevoerd.</p>
+    <p>De route bevat \${stopsText} en wordt nu uitgevoerd.</p>
     <p>U kunt de route live volgen via onderstaande link:</p>
-    <a href="\${routeLink}" class="button">Route live bekijken</a>
+    <a href="\${liveRouteLink}" class="button">Route live bekijken</a>
   </div>
 </body>
 </html>`,
@@ -442,14 +449,14 @@ function DriverDashboard() {
 </head>
 <body>
   <div class="header">
-    <h1>RouteNu</h1>
+    <h1>Routenu.nl</h1>
   </div>
   <div class="content">
     <h2>Beste klant,</h2>
     <p>Route <strong>\${routeName}</strong> voor \${routeDate} is gestart!</p>
-    <p>De route bevat \${stopsCount} stop\${stopsCount !== 1 ? 's' : ''} en wordt nu uitgevoerd.</p>
+    <p>De route bevat \${stopsText} en wordt nu uitgevoerd.</p>
     <p>U kunt de route live volgen via onderstaande link:</p>
-    <a href="\${routeLink}" class="button">Route live bekijken</a>
+    <a href="\${liveRouteLink}" class="button">Route live bekijken</a>
   </div>
 </body>
 </html>`,
@@ -484,10 +491,13 @@ function DriverDashboard() {
         try {
           // Create personal link with email address
           const encodedEmail = encodeURIComponent(stop.email.trim().toLowerCase());
-          const personalRouteLink = `${window.location.origin}/route/${route.id}/${liveRouteToken}/${encodedEmail}`;
+          const personalRouteLink = `${FRONTEND_BASE_URL}/route/${route.id}/${liveRouteToken}/${encodedEmail}`;
           console.log('✓ Generated personal link for email', stop.email, ':', personalRouteLink);
           console.log('  - Encoded email:', encodedEmail);
           console.log('  - Full URL:', personalRouteLink);
+          
+          // Calculate stopsText for proper pluralization
+          const stopsText = `${stopsCount} stop${stopsCount !== 1 ? 's' : ''}`;
           
           // Replace template variables with personalized link
           // First replace escaped placeholders (from default template)
@@ -497,6 +507,7 @@ function DriverDashboard() {
             .replace(/\\\$\{routeLink\}/g, personalRouteLink)
             .replace(/\\\$\{liveRouteLink\}/g, personalRouteLink)
             .replace(/\\\$\{stopsCount\}/g, stopsCount.toString())
+            .replace(/\\\$\{stopsText\}/g, stopsText)
             .replace(/\\\$\{stopName\}/g, stop.name || 'klant')
             // Then replace regular placeholders (from custom templates)
             .replace(/\$\{routeName\}/g, routeName)
@@ -504,6 +515,7 @@ function DriverDashboard() {
             .replace(/\$\{routeLink\}/g, personalRouteLink)
             .replace(/\$\{liveRouteLink\}/g, personalRouteLink)
             .replace(/\$\{stopsCount\}/g, stopsCount.toString())
+            .replace(/\$\{stopsText\}/g, stopsText)
             .replace(/\$\{stopName\}/g, stop.name || 'klant');
           
           // Verify that the link is in the HTML
@@ -637,7 +649,7 @@ function DriverDashboard() {
           try {
             const encodedEmail = stop.email ? encodeURIComponent(stop.email.trim().toLowerCase()) : null;
             const personalRouteLink = encodedEmail 
-              ? `${window.location.origin}/route/${route.id}/${liveRouteToken}/${encodedEmail}`
+              ? `${FRONTEND_BASE_URL}/route/${route.id}/${liveRouteToken}/${encodedEmail}`
               : generalRouteLink;
             
             const stopIdentifier = stop.email || stop.name || `Stop ${stopIndex + 1}`;
@@ -740,7 +752,13 @@ function DriverDashboard() {
 
       // Check if there are more stops
       if (stopIndex < activeRoute.stops.length - 1) {
-        setCurrentStopIndex(stopIndex + 1);
+        // Close modal and reopen for next stop to reset form fields
+        setShowStopModal(false);
+        // Use setTimeout to ensure modal closes before reopening
+        setTimeout(() => {
+          setCurrentStopIndex(stopIndex + 1);
+          setShowStopModal(true);
+        }, 100);
       } else {
         // All stops completed, show complete modal
         setShowStopModal(false);
@@ -825,19 +843,32 @@ function DriverDashboard() {
     );
   }
 
+  // Helper function to format date as YYYY-MM-DD using local time (avoiding timezone issues)
+  const formatDateAsLocalString = (date) => {
+    if (!date) return null;
+    const d = date instanceof Date ? date : new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Filter routes: vandaag en toekomstig
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayStr = today.toISOString().split('T')[0];
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  const todayStr = `${year}-${month}-${day}`; // Format: YYYY-MM-DD (local time)
   
   const todayRoutes = routes.filter(r => {
-    const routeDate = r.date ? new Date(r.date).toISOString().split('T')[0] : null;
-    return routeDate === todayStr;
+    const routeDateStr = formatDateAsLocalString(r.date);
+    return routeDateStr === todayStr;
   });
   
   const futureRoutes = routes.filter(r => {
-    const routeDate = r.date ? new Date(r.date).toISOString().split('T')[0] : null;
-    return routeDate && routeDate > todayStr;
+    const routeDateStr = formatDateAsLocalString(r.date);
+    // Only include routes that are strictly in the future (not today)
+    return routeDateStr && routeDateStr > todayStr;
   });
   
   const currentRoutes = todayRoutes.filter(r => r.route_status === 'started');
@@ -986,6 +1017,9 @@ function DriverDashboard() {
                   ? new Date(route.date).toLocaleDateString('nl-NL')
                   : '-';
                 const stopsCount = route.stops?.length || 0;
+                // Check if route is actually today (in case of timezone issues)
+                const routeDateStr = formatDateAsLocalString(route.date);
+                const isToday = routeDateStr === todayStr;
 
                 return (
                   <div key={route.id} className="route-card">
@@ -1009,6 +1043,15 @@ function DriverDashboard() {
                       >
                         Route overzicht
                       </button>
+                      {/* Show "Route starten" button if route is actually today */}
+                      {isToday && (route.route_status === 'planned' || !route.route_status) && (
+                        <button 
+                          className="btn-start"
+                          onClick={() => handleStartRoute(route.id)}
+                        >
+                          Route starten
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -1079,6 +1122,14 @@ function StopDetailsModal({ stop, stopIndex, totalStops, onSave, onClose, existi
   const [workDescription, setWorkDescription] = useState(existingDetails?.workDescription || '');
   const [amountReceived, setAmountReceived] = useState(existingDetails?.amountReceived || '');
   const [partsCost, setPartsCost] = useState(existingDetails?.partsCost || '');
+  const [showMapChooser, setShowMapChooser] = useState(false);
+
+  // Reset form fields when stopIndex changes (new stop)
+  useEffect(() => {
+    setWorkDescription(existingDetails?.workDescription || '');
+    setAmountReceived(existingDetails?.amountReceived || '');
+    setPartsCost(existingDetails?.partsCost || '');
+  }, [stopIndex, existingDetails]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -1089,17 +1140,54 @@ function StopDetailsModal({ stop, stopIndex, totalStops, onSave, onClose, existi
     });
   };
 
+  const openInAppleMaps = () => {
+    if (!stop.coordinates || !stop.address) return;
+    const [lng, lat] = stop.coordinates;
+    const url = `http://maps.apple.com/?q=${encodeURIComponent(stop.address)}&ll=${lat},${lng}`;
+    window.open(url, '_blank');
+    setShowMapChooser(false);
+  };
+
+  const openInGoogleMaps = () => {
+    if (!stop.coordinates || !stop.address) return;
+    const [lng, lat] = stop.coordinates;
+    // Use universal Google Maps URL that works on all devices
+    const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+    window.open(url, '_blank');
+    setShowMapChooser(false);
+  };
+
   return (
     <div className="modal-overlay">
       <div className="modal-content stop-details-modal">
         <div className="modal-header">
-          <h2>Stop {stopIndex + 1} van {totalStops}</h2>
+          <h2>
+            <span className="current-stop-number">{stopIndex + 1}</span>
+            {' '}van {totalStops}
+          </h2>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
           <div className="stop-info">
             <h3>{stop.name || 'Stop zonder naam'}</h3>
-            {stop.address && <p className="stop-address">{stop.address}</p>}
+            {stop.address && (
+              <p 
+                className="stop-address clickable-address"
+                onClick={() => setShowMapChooser(true)}
+              >
+                📍 {stop.address}
+              </p>
+            )}
+            {stop.email && <p className="stop-contact">📧 {stop.email}</p>}
+            {stop.phone && (
+              <div className="stop-contact">
+                <a href={`tel:${stop.phone.replace(/\s/g, '')}`} className="phone-link-button">
+                  <span className="phone-icon">📞</span>
+                  <span className="phone-text">{stop.phone}</span>
+                  <span className="phone-label">Bel nu</span>
+                </a>
+              </div>
+            )}
           </div>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
@@ -1148,6 +1236,31 @@ function StopDetailsModal({ stop, stopIndex, totalStops, onSave, onClose, existi
           </form>
         </div>
       </div>
+
+      {/* Map Chooser Modal */}
+      {showMapChooser && (
+        <div className="modal-overlay" onClick={() => setShowMapChooser(false)}>
+          <div className="modal-content map-chooser-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Open in kaart</h2>
+              <button className="close-button" onClick={() => setShowMapChooser(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p className="map-chooser-address">{stop.address}</p>
+              <div className="map-chooser-buttons">
+                <button className="btn-apple-maps" onClick={openInAppleMaps}>
+                  <span className="map-icon">🗺️</span>
+                  <span>Kaarten</span>
+                </button>
+                <button className="btn-google-maps" onClick={openInGoogleMaps}>
+                  <span className="map-icon">📍</span>
+                  <span>Google Maps</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1228,6 +1341,10 @@ function CompleteRouteModal({ route, hoursWorked, onHoursChange, kilometersDrive
 
 // Route Overview Modal Component
 function RouteOverviewModal({ route, timestamps, onClose }) {
+  const [showMapChooser, setShowMapChooser] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState(null);
+  const [selectedCoordinates, setSelectedCoordinates] = useState(null);
+
   const formatTime = (timeString) => {
     if (!timeString) return '--:--';
     const date = new Date(timeString);
@@ -1241,6 +1358,41 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
       month: 'long', 
       year: 'numeric' 
     });
+  };
+
+  const handleAddressClick = (address, coordinates) => {
+    setSelectedAddress(address);
+    setSelectedCoordinates(coordinates);
+    setShowMapChooser(true);
+  };
+
+  const openInAppleMaps = () => {
+    if (!selectedCoordinates || !selectedAddress) return;
+    const [lng, lat] = selectedCoordinates;
+    const url = `http://maps.apple.com/?q=${encodeURIComponent(selectedAddress)}&ll=${lat},${lng}`;
+    window.open(url, '_blank');
+    setShowMapChooser(false);
+  };
+
+  const openInGoogleMaps = () => {
+    if (!selectedCoordinates || !selectedAddress) return;
+    const [lng, lat] = selectedCoordinates;
+    // Try native app first, fallback to web
+    const nativeUrl = `comgooglemaps://?q=${lat},${lng}&center=${lat},${lng}&zoom=14`;
+    const webUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+    
+    // Try to open native app, fallback to web
+    const link = document.createElement('a');
+    link.href = nativeUrl;
+    link.target = '_blank';
+    link.click();
+    
+    // Fallback to web if native doesn't work
+    setTimeout(() => {
+      window.open(webUrl, '_blank');
+    }, 500);
+    
+    setShowMapChooser(false);
   };
 
   // Calculate estimated end time based on route data
@@ -1263,6 +1415,55 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
     const totalDuration = route.route_data.duration || 0; // in seconds
     const endTime = new Date(startTime.getTime() + (totalDuration * 1000));
     return endTime;
+  };
+
+  // Calculate planned arrival and departure times for each stop
+  const calculatePlannedTimes = (stopIndex) => {
+    if (!route.route_data || !route.stops || stopIndex >= route.stops.length) {
+      return { arrival: null, departure: null, serviceTime: null };
+    }
+
+    // Get start time
+    let startTime;
+    if (route.route_started_at) {
+      startTime = new Date(route.route_started_at);
+    } else {
+      const departureTime = route.departure_time || '08:00';
+      const [hours, minutes] = departureTime.split(':').map(Number);
+      startTime = new Date();
+      startTime.setHours(hours, minutes, 0, 0);
+    }
+
+    // Calculate cumulative duration to this stop
+    let cumulativeDuration = 0;
+    if (route.route_data.waypoints && route.route_data.waypoints.length > 0) {
+      // waypoints[0] is start, waypoints[1] is first stop, etc.
+      // Waypoint durations are typically segment durations (time from previous waypoint)
+      // We need to sum all segment durations up to this stop
+      
+      for (let i = 0; i <= stopIndex; i++) {
+        // Get segment duration for this leg (from waypoint i to waypoint i+1)
+        const segmentDuration = route.route_data.waypoints[i + 1]?.duration || 
+                                (route.route_data.duration / (route.stops.length + 1));
+        cumulativeDuration += segmentDuration;
+      }
+    } else {
+      // Fallback: divide duration evenly
+      const durationPerSegment = route.route_data.duration / (route.stops.length + 1);
+      cumulativeDuration = durationPerSegment * (stopIndex + 1);
+    }
+
+    const arrivalTime = new Date(startTime.getTime() + (cumulativeDuration * 1000));
+    
+    // Get service time (from route_data or default 5 minutes)
+    const serviceTimeMinutes = route.route_data?.service_time || 5;
+    const departureTime = new Date(arrivalTime.getTime() + (serviceTimeMinutes * 60 * 1000));
+
+    return {
+      arrival: arrivalTime,
+      departure: departureTime,
+      serviceTime: serviceTimeMinutes
+    };
   };
 
   const endTime = calculateEndTime();
@@ -1303,12 +1504,26 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
               <span className="info-label">Totaal aantal stops:</span>
               <span className="info-value">{route.stops?.length || 0}</span>
             </div>
-            {route.route_data?.duration && (
-              <div className="info-row">
-                <span className="info-label">Verwachte duur:</span>
-                <span className="info-value">{Math.round(route.route_data.duration / 60)} minuten</span>
-              </div>
-            )}
+            {route.route_data?.duration && (() => {
+              const totalMinutes = Math.round(route.route_data.duration / 60);
+              const hours = Math.floor(totalMinutes / 60);
+              const minutes = totalMinutes % 60;
+              let durationText = '';
+              if (hours > 0) {
+                durationText = `${hours} ${hours === 1 ? 'uur' : 'uren'}`;
+                if (minutes > 0) {
+                  durationText += ` en ${minutes} ${minutes === 1 ? 'minuut' : 'minuten'}`;
+                }
+              } else {
+                durationText = `${minutes} ${minutes === 1 ? 'minuut' : 'minuten'}`;
+              }
+              return (
+                <div className="info-row">
+                  <span className="info-label">Verwachte duur:</span>
+                  <span className="info-value">{durationText}</span>
+                </div>
+              );
+            })()}
           </div>
 
           <div className="stops-overview">
@@ -1319,6 +1534,7 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
                   const timestamp = timestamps.find(t => t.stop_index === index);
                   const isCompleted = timestamp && timestamp.actual_arrival_time;
                   const hasDeparted = timestamp && timestamp.actual_departure_time;
+                  const plannedTimes = calculatePlannedTimes(index);
 
                   return (
                     <div key={index} className={`stop-overview-item ${isCompleted ? 'completed' : ''}`}>
@@ -1326,9 +1542,24 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
                         <div className="stop-number-overview">{index + 1}</div>
                         <div className="stop-info-overview">
                           <h4>{stop.name || `Stop ${index + 1}`}</h4>
-                          {stop.address && <p className="stop-address-overview">{stop.address}</p>}
+                          {stop.address && (
+                            <p 
+                              className="stop-address-overview clickable-address"
+                              onClick={() => handleAddressClick(stop.address, stop.coordinates)}
+                            >
+                              📍 {stop.address}
+                            </p>
+                          )}
                           {stop.email && <p className="stop-contact-overview">📧 {stop.email}</p>}
-                          {stop.phone && <p className="stop-contact-overview">📞 {stop.phone}</p>}
+                          {stop.phone && (
+                            <div className="stop-contact-overview">
+                              <a href={`tel:${stop.phone.replace(/\s/g, '')}`} className="phone-link-button">
+                                <span className="phone-icon">📞</span>
+                                <span className="phone-text">{stop.phone}</span>
+                                <span className="phone-label">Bel nu</span>
+                              </a>
+                            </div>
+                          )}
                         </div>
                         {isCompleted && (
                           <div className="stop-status-overview completed">
@@ -1337,15 +1568,32 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
                         )}
                       </div>
                       <div className="stop-times-overview">
+                        {/* Geplande tijden */}
+                        <div className="time-info-overview">
+                          <span className="time-label-overview">Geplande aankomst:</span>
+                          <span className="time-value-overview planned">{plannedTimes.arrival ? formatTime(plannedTimes.arrival.toISOString()) : '--:--'}</span>
+                        </div>
+                        {plannedTimes.serviceTime && (
+                          <div className="time-info-overview">
+                            <span className="time-label-overview">Service tijd:</span>
+                            <span className="time-value-overview planned">{plannedTimes.serviceTime} min</span>
+                          </div>
+                        )}
+                        <div className="time-info-overview">
+                          <span className="time-label-overview">Geplande eindtijd:</span>
+                          <span className="time-value-overview planned">{plannedTimes.departure ? formatTime(plannedTimes.departure.toISOString()) : '--:--'}</span>
+                        </div>
+                        
+                        {/* Werkelijke tijden (als beschikbaar) */}
                         {timestamp && timestamp.actual_arrival_time && (
                           <div className="time-info-overview">
-                            <span className="time-label-overview">Aangekomen:</span>
+                            <span className="time-label-overview">Werkelijke aankomst:</span>
                             <span className="time-value-overview actual">{formatTime(timestamp.actual_arrival_time)}</span>
                           </div>
                         )}
                         {timestamp && timestamp.actual_departure_time && (
                           <div className="time-info-overview">
-                            <span className="time-label-overview">Vertrokken:</span>
+                            <span className="time-label-overview">Werkelijke vertrek:</span>
                             <span className="time-value-overview actual">{formatTime(timestamp.actual_departure_time)}</span>
                           </div>
                         )}
@@ -1364,6 +1612,30 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
               )}
             </div>
           </div>
+
+          {/* Route kaart */}
+          {route.stops && route.stops.length > 0 && (
+            <div className="route-map-overview">
+              <h3>Route op kaart</h3>
+              <div className="map-container-overview">
+                <Map
+                  mapboxToken={MAPBOX_PUBLIC_TOKEN}
+                  route={route.route_data?.geometry ? {
+                    geometry: route.route_data.geometry,
+                    distance: route.route_data.distance,
+                    duration: route.route_data.duration
+                  } : null}
+                  stops={route.stops}
+                  startCoordinates={route.route_data?.waypoints?.[0]?.coordinates || 
+                                   (route.stops.length > 0 && route.stops[0]?.coordinates ? route.stops[0].coordinates : null)}
+                  center={route.route_data?.waypoints?.[0]?.coordinates || 
+                         (route.stops.length > 0 && route.stops[0]?.coordinates ? route.stops[0].coordinates : [5.2913, 52.1326])}
+                  zoom={route.stops.length > 1 ? 10 : 12}
+                  completedStops={new Set(timestamps.filter(t => t.actual_arrival_time).map(t => t.stop_index))}
+                />
+              </div>
+            </div>
+          )}
         </div>
         <div className="modal-footer">
           <button className="btn-close" onClick={onClose}>
@@ -1371,6 +1643,31 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
           </button>
         </div>
       </div>
+
+      {/* Map Chooser Modal */}
+      {showMapChooser && (
+        <div className="modal-overlay" onClick={() => setShowMapChooser(false)}>
+          <div className="modal-content map-chooser-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Open in kaart</h2>
+              <button className="close-button" onClick={() => setShowMapChooser(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p className="map-chooser-address">{selectedAddress}</p>
+              <div className="map-chooser-buttons">
+                <button className="btn-apple-maps" onClick={openInAppleMaps}>
+                  <span className="map-icon">🗺️</span>
+                  <span>Kaarten</span>
+                </button>
+                <button className="btn-google-maps" onClick={openInGoogleMaps}>
+                  <span className="map-icon">📍</span>
+                  <span>Google Maps</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -22,7 +22,6 @@ CREATE POLICY "Public can view routes with valid stop token" ON routes
   FOR SELECT USING (
     stop_tokens IS NOT NULL 
     AND stop_tokens != '{}'::jsonb
-    AND route_status = 'started'
   );
 
 -- Note: The stop_tokens JSONB will contain:

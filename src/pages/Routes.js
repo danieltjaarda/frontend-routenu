@@ -1,20 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getUserRoutes, deleteItem, saveRoute } from '../services/userData';
+import { getUserRoutes, deleteItem, saveRoute, getUserProfile } from '../services/userData';
 import CalendarModal from '../components/CalendarModal';
 import jsPDF from 'jspdf';
 import './Routes.css';
 
 function Routes({ onSelectRoute }) {
   const { currentUser } = useAuth();
+  const [userServiceTime, setUserServiceTime] = useState(5);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [searchDate, setSearchDate] = useState('');
-  const [filterStatus, setFilterStatus] = useState('Actieve routes');
+  const [filterStatus, setFilterStatus] = useState('Huidige routes');
   const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deletingRouteId, setDeletingRouteId] = useState(null);
   const [editingRouteId, setEditingRouteId] = useState(null);
   const [editingRouteName, setEditingRouteName] = useState('');
+  const [copyingRouteId, setCopyingRouteId] = useState(null);
+  const [isCopyCalendarOpen, setIsCopyCalendarOpen] = useState(false);
+
+  // Load user service time
+  useEffect(() => {
+    const loadUserServiceTime = async () => {
+      if (currentUser) {
+        try {
+          const profile = await getUserProfile(currentUser.id);
+          if (profile?.service_time) {
+            setUserServiceTime(profile.service_time);
+          }
+        } catch (error) {
+          console.error('Error loading user service time:', error);
+        }
+      }
+    };
+    loadUserServiceTime();
+  }, [currentUser]);
 
   // Load routes from database
   useEffect(() => {
@@ -117,6 +137,67 @@ function Routes({ onSelectRoute }) {
     }
   };
 
+  const handleCopyRoute = (route) => {
+    setCopyingRouteId(route.id);
+    setIsCopyCalendarOpen(true);
+  };
+
+  const handleCopyDateSelect = async (date) => {
+    if (!currentUser || !copyingRouteId) return;
+
+    setIsCopyCalendarOpen(false);
+    
+    try {
+      const routeToCopy = routes.find(r => r.id === copyingRouteId);
+      if (!routeToCopy) {
+        alert('Route niet gevonden');
+        setCopyingRouteId(null);
+        return;
+      }
+
+      // Format the new date - avoid timezone issues by using local date components
+      let newDateStr;
+      if (date instanceof Date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        newDateStr = `${year}-${month}-${day}`;
+      } else {
+        const d = new Date(date);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        newDateStr = `${year}-${month}-${day}`;
+      }
+
+      // Create new route with same data but new date
+      // Only include fields that exist in the database
+      const newRouteData = {
+        name: `${routeToCopy.name || 'Route'} (kopie)`,
+        date: newDateStr,
+        stops: routeToCopy.stops || [],
+        route_data: routeToCopy.route_data || null,
+        selected_driver: routeToCopy.selected_driver || null,
+        driver_id: routeToCopy.driver_id || null,
+        route_status: 'planned',
+        diesel_price_per_liter: routeToCopy.diesel_price_per_liter || null
+      };
+
+      const newRouteId = await saveRoute(currentUser.id, newRouteData);
+      
+      // Reload routes to show the new copied route
+      const userRoutes = await getUserRoutes(currentUser.id);
+      setRoutes(userRoutes);
+      
+      alert('Route succesvol gekopieerd naar ' + new Date(newDateStr).toLocaleDateString('nl-NL'));
+      setCopyingRouteId(null);
+    } catch (error) {
+      console.error('Error copying route:', error);
+      alert('Fout bij kopiëren route: ' + (error.message || 'Onbekende fout'));
+      setCopyingRouteId(null);
+    }
+  };
+
   // Calculate arrival times for stops
   const calculateArrivalTimes = (route) => {
     if (!route || !route.stops || route.stops.length === 0) return [];
@@ -139,7 +220,9 @@ function Routes({ onSelectRoute }) {
         cumulativeDuration += segmentDuration;
         
         const arrivalTime = new Date(startTime.getTime() + (cumulativeDuration * 1000));
-        const departureTime = new Date(arrivalTime.getTime() + (5 * 60 * 1000)); // 5 minuten per stop
+        // Use service time from user profile, or from route_data, or default 5 minutes
+        const serviceTimeMinutes = userServiceTime || route.route_data?.service_time || 5;
+        const departureTime = new Date(arrivalTime.getTime() + (serviceTimeMinutes * 60 * 1000));
         
         times.push({
           arrival: arrivalTime.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }),
@@ -155,7 +238,9 @@ function Routes({ onSelectRoute }) {
         currentTime = new Date(currentTime.getTime() + (segmentDuration * 1000));
         
         const arrivalTime = new Date(currentTime);
-        const departureTime = new Date(arrivalTime.getTime() + (5 * 60 * 1000)); // 5 minuten per stop
+        // Use service time from user profile, or from route_data, or default 5 minutes
+        const serviceTimeMinutes = userServiceTime || route.route_data?.service_time || 5;
+        const departureTime = new Date(arrivalTime.getTime() + (serviceTimeMinutes * 60 * 1000));
         
         times.push({
           arrival: arrivalTime.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }),
@@ -379,6 +464,81 @@ function Routes({ onSelectRoute }) {
     }
   };
 
+  // Helper function to get local date as YYYY-MM-DD string (avoiding timezone issues)
+  const getLocalDateString = (date) => {
+    if (!date) return null;
+    
+    if (typeof date === 'string') {
+      // If it's already a string, use it directly (should be YYYY-MM-DD)
+      return date.split('T')[0]; // Remove time part if present
+    } else {
+      // If it's a Date object, convert to local YYYY-MM-DD
+      const d = new Date(date);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+  };
+
+  // Filter routes based on selected status
+  const filteredRoutes = React.useMemo(() => {
+    if (!routes || routes.length === 0) return [];
+    
+    // Get today's date as YYYY-MM-DD string using local time (not UTC)
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${day}`; // Format: YYYY-MM-DD (local time)
+    
+    switch (filterStatus) {
+      case 'Huidige routes':
+        // Show routes with today's date or future dates
+        const filtered = routes.filter(route => {
+          if (!route.date) {
+            console.log('Route has no date:', route.id, route.name);
+            return false;
+          }
+          
+          // Get route date as YYYY-MM-DD string (local time)
+          const routeDateStr = getLocalDateString(route.date);
+          if (!routeDateStr) {
+            return false;
+          }
+          
+          // Compare as strings (YYYY-MM-DD format allows string comparison)
+          // Include routes from today (>=) and all future dates
+          const isIncluded = routeDateStr >= todayStr;
+          console.log('Filtering route:', {
+            routeName: route.name,
+            routeDate: route.date,
+            routeDateStr,
+            todayStr,
+            isIncluded
+          });
+          return isIncluded;
+        });
+        console.log('Huidige routes filter result:', {
+          totalRoutes: routes.length,
+          filteredCount: filtered.length,
+          todayStr
+        });
+        return filtered;
+      
+      case 'Voltooide routes':
+        // Only show completed routes
+        return routes.filter(route => route.route_status === 'completed');
+      
+      case 'Alle routes':
+        // Show all routes
+        return routes;
+      
+      default:
+        return routes;
+    }
+  }, [routes, filterStatus]);
+
   return (
     <div className="routes-page">
       <div className="routes-header">
@@ -390,7 +550,7 @@ function Routes({ onSelectRoute }) {
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
           >
-            <option>Actieve routes</option>
+            <option>Huidige routes</option>
             <option>Alle routes</option>
             <option>Voltooide routes</option>
           </select>
@@ -407,7 +567,7 @@ function Routes({ onSelectRoute }) {
           <div className="empty-routes">
             <p>Routes laden...</p>
           </div>
-        ) : routes.length > 0 ? (
+        ) : filteredRoutes.length > 0 ? (
           <table className="routes-table">
             <thead>
               <tr>
@@ -420,7 +580,7 @@ function Routes({ onSelectRoute }) {
               </tr>
             </thead>
             <tbody>
-              {routes.map((route, index) => {
+              {filteredRoutes.map((route, index) => {
                 const stopsCount = route.stops?.length || 0;
                 const distance = route.route_data?.distance 
                   ? `${(route.route_data.distance / 1000).toFixed(1)} km` 
@@ -439,7 +599,7 @@ function Routes({ onSelectRoute }) {
                 const isToday = routeDateObj && routeDateObj.getTime() === today.getTime();
                 const isCompleted = route.route_status === 'completed';
 
-                // Count routes on the same date and get index
+                // Count routes on the same date and get index (from all routes, not just filtered)
                 const routeDateStr = route.date ? new Date(route.date).toISOString().split('T')[0] : null;
                 const routesOnSameDate = routes.filter(r => {
                   if (!r.date) return false;
@@ -541,6 +701,21 @@ function Routes({ onSelectRoute }) {
                     <td className="actions-cell" onClick={(e) => e.stopPropagation()}>
                       <div className="action-buttons">
                         <button 
+                          className="btn-copy"
+                          onClick={() => handleCopyRoute(route)}
+                          disabled={copyingRouteId === route.id}
+                          title="Route kopiëren naar andere datum"
+                        >
+                          {copyingRouteId === route.id ? (
+                            <span className="copy-loading">...</span>
+                          ) : (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                          )}
+                        </button>
+                        <button 
                           className="btn-download"
                           onClick={() => handleDownloadRoute(route)}
                           title="Route downloaden als PDF"
@@ -577,8 +752,16 @@ function Routes({ onSelectRoute }) {
           </table>
         ) : (
           <div className="empty-routes">
-            <p>Nog geen routes aangemaakt</p>
-            <p className="empty-hint">Klik op "+ Nieuwe route" om een route aan te maken</p>
+            <p>
+              {filterStatus === 'Huidige routes' 
+                ? 'Geen huidige routes gevonden' 
+                : filterStatus === 'Voltooide routes'
+                ? 'Geen voltooide routes gevonden'
+                : 'Nog geen routes aangemaakt'}
+            </p>
+            {filterStatus === 'Alle routes' && (
+              <p className="empty-hint">Klik op "+ Nieuwe route" om een route aan te maken</p>
+            )}
           </div>
         )}
       </div>
@@ -587,6 +770,15 @@ function Routes({ onSelectRoute }) {
         isOpen={isCalendarOpen}
         onClose={() => setIsCalendarOpen(false)}
         onDateSelect={handleDateSelect}
+      />
+
+      <CalendarModal
+        isOpen={isCopyCalendarOpen}
+        onClose={() => {
+          setIsCopyCalendarOpen(false);
+          setCopyingRouteId(null);
+        }}
+        onDateSelect={handleCopyDateSelect}
       />
 
       <div className="page-logo-footer">

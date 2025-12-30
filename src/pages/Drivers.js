@@ -26,6 +26,7 @@ function Drivers() {
   const [driverFormLoading, setDriverFormLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successEmail, setSuccessEmail] = useState('');
+  const [editingDriver, setEditingDriver] = useState(null);
 
   useEffect(() => {
     const loadDrivers = async () => {
@@ -86,6 +87,58 @@ function Drivers() {
       ...prev,
       [name]: value
     }));
+  };
+
+  const handleEditDriver = (driver) => {
+    setEditingDriver(driver);
+    setDriverFormData({
+      name: driver.name || '',
+      email: driver.email || '',
+      phone: driver.phone || '',
+      license_number: driver.license_number || '',
+      password: '',
+      hourly_rate: driver.hourly_rate ? driver.hourly_rate.toString() : '',
+      withoutAccount: !driver.email
+    });
+    setIsDriverFormOpen(true);
+  };
+
+  const handleUpdateDriver = async (e) => {
+    e.preventDefault();
+    if (!editingDriver || !currentUser) return;
+
+    setDriverFormLoading(true);
+    try {
+      const { updateItem } = await import('../services/userData');
+      await updateItem('drivers', editingDriver.id, {
+        name: driverFormData.name,
+        phone: driverFormData.phone || null,
+        license_number: driverFormData.license_number || null,
+        hourly_rate: driverFormData.hourly_rate ? parseFloat(driverFormData.hourly_rate) : null
+      });
+
+      // Reload drivers list
+      const userDrivers = await getUserDrivers(currentUser.id);
+      setDrivers(userDrivers || []);
+
+      alert('Chauffeur bijgewerkt!');
+      setIsDriverFormOpen(false);
+      setEditingDriver(null);
+      setDriverFormData({
+        name: '',
+        email: '',
+        phone: '',
+        license_number: '',
+        password: '',
+        hourly_rate: '',
+        withoutAccount: false
+      });
+    } catch (error) {
+      console.error('Error updating driver:', error);
+      alert('Fout bij bijwerken chauffeur: ' + (error.message || 'Onbekende fout'));
+    } finally {
+      setDriverFormLoading(false);
+    }
   };
 
   const handleDriverSubmit = async (e) => {
@@ -308,6 +361,7 @@ function Drivers() {
                 <th>E-mailadres</th>
                 <th>Telefoonnummer</th>
                 <th>Rijbewijsnummer</th>
+                <th>Uurtarief</th>
                 <th>Acties</th>
               </tr>
             </thead>
@@ -318,24 +372,37 @@ function Drivers() {
                   <td>{driver.email || '-'}</td>
                   <td>{driver.phone || '-'}</td>
                   <td>{driver.license_number || '-'}</td>
+                  <td>{driver.hourly_rate ? `€${parseFloat(driver.hourly_rate).toFixed(2)}` : '-'}</td>
                   <td className="actions-cell" onClick={(e) => e.stopPropagation()}>
-                    <button 
-                      className="btn-delete"
-                      onClick={() => handleDeleteDriver(driver.id, driver.name)}
-                      disabled={deletingDriverId === driver.id}
-                      title="Chauffeur verwijderen"
-                    >
-                      {deletingDriverId === driver.id ? (
-                        <span className="delete-loading">...</span>
-                      ) : (
+                    <div className="action-buttons">
+                      <button 
+                        className="btn-edit"
+                        onClick={() => handleEditDriver(driver)}
+                        title="Chauffeur bewerken"
+                      >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="3 6 5 6 21 6"></polyline>
-                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                          <line x1="10" y1="11" x2="10" y2="17"></line>
-                          <line x1="14" y1="11" x2="14" y2="17"></line>
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                         </svg>
-                      )}
-                    </button>
+                      </button>
+                      <button 
+                        className="btn-delete"
+                        onClick={() => handleDeleteDriver(driver.id, driver.name)}
+                        disabled={deletingDriverId === driver.id}
+                        title="Chauffeur verwijderen"
+                      >
+                        {deletingDriverId === driver.id ? (
+                          <span className="delete-loading">...</span>
+                        ) : (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                          </svg>
+                        )}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -353,30 +420,44 @@ function Drivers() {
         <div className="vehicle-form-overlay">
           <div className="vehicle-form-content" onClick={(e) => e.stopPropagation()}>
             <div className="vehicle-form-header">
-              <h2>Chauffeur toevoegen</h2>
-              <button className="close-button" onClick={() => setIsDriverFormOpen(false)}>×</button>
+              <h2>{editingDriver ? 'Chauffeur bewerken' : 'Chauffeur toevoegen'}</h2>
+              <button className="close-button" onClick={() => {
+                setIsDriverFormOpen(false);
+                setEditingDriver(null);
+                setDriverFormData({
+                  name: '',
+                  email: '',
+                  phone: '',
+                  license_number: '',
+                  password: '',
+                  hourly_rate: '',
+                  withoutAccount: false
+                });
+              }}>×</button>
             </div>
 
-            <form onSubmit={handleDriverSubmit} className="vehicle-form">
-              <div className="form-group checkbox-group">
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    name="withoutAccount"
-                    checked={driverFormData.withoutAccount}
-                    onChange={(e) => {
-                      setDriverFormData(prev => ({
-                        ...prev,
-                        withoutAccount: e.target.checked,
-                        email: e.target.checked ? '' : prev.email,
-                        password: e.target.checked ? '' : prev.password
-                      }));
-                    }}
-                    disabled={driverFormLoading}
-                  />
-                  Chauffeur zonder account toevoegen (geen inlog mogelijk)
-                </label>
-              </div>
+            <form onSubmit={editingDriver ? handleUpdateDriver : handleDriverSubmit} className="vehicle-form">
+              {!editingDriver && (
+                <div className="form-group checkbox-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      name="withoutAccount"
+                      checked={driverFormData.withoutAccount}
+                      onChange={(e) => {
+                        setDriverFormData(prev => ({
+                          ...prev,
+                          withoutAccount: e.target.checked,
+                          email: e.target.checked ? '' : prev.email,
+                          password: e.target.checked ? '' : prev.password
+                        }));
+                      }}
+                      disabled={driverFormLoading}
+                    />
+                    Chauffeur zonder account toevoegen (geen inlog mogelijk)
+                  </label>
+                </div>
+              )}
 
               <div className="form-group">
                 <label htmlFor="driver-name">Naam *</label>
@@ -391,7 +472,7 @@ function Drivers() {
                 />
               </div>
 
-              {!driverFormData.withoutAccount && (
+              {!editingDriver && !driverFormData.withoutAccount && (
                 <>
                   <div className="form-group">
                     <label htmlFor="driver-email">E-mailadres *</label>
@@ -423,7 +504,7 @@ function Drivers() {
                 </>
               )}
 
-              {driverFormData.withoutAccount && (
+              {!editingDriver && driverFormData.withoutAccount && (
                 <div className="form-group">
                   <label htmlFor="driver-email-optional">E-mailadres (optioneel)</label>
                   <input
@@ -435,6 +516,21 @@ function Drivers() {
                     disabled={driverFormLoading}
                     placeholder="Voor contactdoeleinden"
                   />
+                </div>
+              )}
+
+              {editingDriver && driverFormData.email && (
+                <div className="form-group">
+                  <label>E-mailadres</label>
+                  <input
+                    type="email"
+                    value={driverFormData.email}
+                    disabled
+                    className="input-disabled"
+                  />
+                  <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    E-mailadres kan niet worden gewijzigd
+                  </small>
                 </div>
               )}
 
@@ -481,7 +577,19 @@ function Drivers() {
                 <button
                   type="button"
                   className="btn-cancel"
-                  onClick={() => setIsDriverFormOpen(false)}
+                  onClick={() => {
+                    setIsDriverFormOpen(false);
+                    setEditingDriver(null);
+                    setDriverFormData({
+                      name: '',
+                      email: '',
+                      phone: '',
+                      license_number: '',
+                      password: '',
+                      hourly_rate: '',
+                      withoutAccount: false
+                    });
+                  }}
                   disabled={driverFormLoading}
                 >
                   Annuleren
@@ -491,7 +599,7 @@ function Drivers() {
                   className="btn-submit"
                   disabled={driverFormLoading}
                 >
-                  {driverFormLoading ? 'Opslaan...' : 'Chauffeur toevoegen'}
+                  {driverFormLoading ? 'Opslaan...' : (editingDriver ? 'Chauffeur bijwerken' : 'Chauffeur toevoegen')}
                 </button>
               </div>
             </form>

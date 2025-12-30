@@ -14,7 +14,6 @@ CREATE POLICY "Public can view route stop timestamps with valid live token" ON r
       SELECT id FROM routes
       WHERE live_route_token IS NOT NULL 
       AND live_route_token != ''
-      AND route_status = 'started'
     )
   );
 

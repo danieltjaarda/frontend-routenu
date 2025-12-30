@@ -569,6 +569,7 @@ function Vehicles({ vehicles: propVehicles = [], onVehicleAdded, setVehicles: se
                 <th>Kenteken</th>
                 <th>Chauffeur</th>
                 <th>Brandstof</th>
+                <th>Kosten/km</th>
                 <th>Starttijd</th>
                 <th>Eindtijd</th>
                 <th>Acties</th>
@@ -581,6 +582,7 @@ function Vehicles({ vehicles: propVehicles = [], onVehicleAdded, setVehicles: se
                   <td>{vehicle.kenteken || '-'}</td>
                   <td>{vehicle.chauffeur || '-'}</td>
                   <td>{vehicle.brandstofType || '-'}</td>
+                  <td>{vehicle.cents_per_km || vehicle.centsPerKm ? `€${(parseFloat(vehicle.cents_per_km || vehicle.centsPerKm) / 100).toFixed(2)}/km` : '-'}</td>
                   <td>{vehicle.starttijd || '-'}</td>
                   <td>{vehicle.eindtijd || '-'}</td>
                   <td className="actions-cell" onClick={(e) => e.stopPropagation()}>
@@ -742,6 +744,26 @@ function Vehicles({ vehicles: propVehicles = [], onVehicleAdded, setVehicles: se
                   onChange={handleInputChange}
                   placeholder="0"
                 />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="centsPerKm">
+                  Kosten per km (cent)
+                  <span className="info-icon">ℹ️</span>
+                </label>
+                <input
+                  type="number"
+                  id="centsPerKm"
+                  name="centsPerKm"
+                  value={formData.centsPerKm}
+                  onChange={handleInputChange}
+                  placeholder="bijv. 19 voor €0,19/km"
+                  step="0.01"
+                  min="0"
+                />
+                <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                  Voer het bedrag in centen in (bijv. 19 = €0,19 per km)
+                </small>
               </div>
 
               <div className="form-group">

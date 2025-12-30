@@ -14,6 +14,12 @@ function Analytics() {
   const [vehicles, setVehicles] = useState([]);
   const [periodFilter, setPeriodFilter] = useState('all'); // 'all', 'day', 'week', 'month', 'quarter', 'year', 'date'
   const [selectedDate, setSelectedDate] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const [btwPercentage, setBtwPercentage] = useState(() => {
+    const saved = localStorage.getItem('analytics_btw_percentage');
+    return saved ? parseFloat(saved) : 0;
+  });
+  const [tempBtwPercentage, setTempBtwPercentage] = useState(btwPercentage);
 
   useEffect(() => {
     const loadRoutes = async () => {
@@ -390,6 +396,16 @@ function Analytics() {
                 max={new Date().toISOString().split('T')[0]}
               />
             )}
+            <button 
+              className="btn-settings"
+              onClick={() => {
+                setTempBtwPercentage(btwPercentage);
+                setShowSettings(true);
+              }}
+              title="Instellingen"
+            >
+              ⚙️
+            </button>
           </div>
         </div>
         
@@ -408,6 +424,24 @@ function Analytics() {
               </div>
               <div className="summary-period">{getPeriodLabel()}</div>
             </div>
+            {totals.totalVehicleCost > 0 && (
+              <div className="summary-card">
+                <div className="summary-label">Voertuigkosten</div>
+                <div className="summary-value costs">
+                  €{totals.totalVehicleCost.toFixed(2)}
+                </div>
+                <div className="summary-period">{getPeriodLabel()}</div>
+              </div>
+            )}
+            {totals.totalDriverCost > 0 && (
+              <div className="summary-card">
+                <div className="summary-label">Chauffeurkosten</div>
+                <div className="summary-value costs">
+                  €{totals.totalDriverCost.toFixed(2)}
+                </div>
+                <div className="summary-period">{getPeriodLabel()}</div>
+              </div>
+            )}
             {totals.totalMonthlyCosts > 0 && (
               <div className="summary-card">
                 <div className="summary-label">Maandelijkse Kosten</div>
@@ -418,12 +452,30 @@ function Analytics() {
               </div>
             )}
             <div className="summary-card highlight">
-              <div className="summary-label">Totale Winst</div>
+              <div className="summary-label">Bruto Winst</div>
               <div className={`summary-value ${totals.totalProfit >= 0 ? 'profit' : 'loss'}`}>
                 €{totals.totalProfit.toFixed(2)}
               </div>
               <div className="summary-period">{getPeriodLabel()}</div>
             </div>
+            {btwPercentage > 0 && totals.totalProfit > 0 && (
+              <div className="summary-card">
+                <div className="summary-label">BTW ({btwPercentage}%)</div>
+                <div className="summary-value costs">
+                  €{(totals.totalProfit * (btwPercentage / 100)).toFixed(2)}
+                </div>
+                <div className="summary-period">{getPeriodLabel()}</div>
+              </div>
+            )}
+            {btwPercentage > 0 && totals.totalProfit > 0 && (
+              <div className="summary-card highlight-green">
+                <div className="summary-label">Netto Winst</div>
+                <div className={`summary-value ${(totals.totalProfit - (totals.totalProfit * (btwPercentage / 100))) >= 0 ? 'profit' : 'loss'}`}>
+                  €{(totals.totalProfit - (totals.totalProfit * (btwPercentage / 100))).toFixed(2)}
+                </div>
+                <div className="summary-period">{getPeriodLabel()}</div>
+              </div>
+            )}
             <div className="summary-card">
               <div className="summary-label">Aantal Routes</div>
               <div className="summary-value">{routes.length}</div>
@@ -432,6 +484,49 @@ function Analytics() {
           </div>
         )}
       </div>
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="settings-modal-overlay" onClick={() => setShowSettings(false)}>
+          <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="settings-modal-header">
+              <h2>⚙️ Instellingen</h2>
+              <button className="close-button" onClick={() => setShowSettings(false)}>×</button>
+            </div>
+            <div className="settings-modal-body">
+              <div className="settings-group">
+                <label htmlFor="btw-percentage">BTW Percentage (%)</label>
+                <input
+                  type="number"
+                  id="btw-percentage"
+                  value={tempBtwPercentage}
+                  onChange={(e) => setTempBtwPercentage(parseFloat(e.target.value) || 0)}
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  placeholder="bijv. 21"
+                />
+                <small>Dit percentage wordt van de bruto winst afgetrokken om de netto winst te berekenen.</small>
+              </div>
+            </div>
+            <div className="settings-modal-footer">
+              <button className="btn-cancel" onClick={() => setShowSettings(false)}>
+                Annuleren
+              </button>
+              <button 
+                className="btn-save"
+                onClick={() => {
+                  setBtwPercentage(tempBtwPercentage);
+                  localStorage.setItem('analytics_btw_percentage', tempBtwPercentage.toString());
+                  setShowSettings(false);
+                }}
+              >
+                Opslaan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="analytics-content">
         {routes.length === 0 ? (
@@ -535,7 +630,13 @@ function Analytics() {
                             </>
                           );
                         })()}
-                        <p className="profit"><strong>Winst:</strong> €{profit.toFixed(2)}</p>
+                        <p className="profit"><strong>Bruto Winst:</strong> €{profit.toFixed(2)}</p>
+                        {btwPercentage > 0 && profit > 0 && (
+                          <>
+                            <p className="btw-cost"><strong>BTW ({btwPercentage}%):</strong> €{(profit * (btwPercentage / 100)).toFixed(2)}</p>
+                            <p className="netto-profit"><strong>Netto Winst:</strong> €{(profit - (profit * (btwPercentage / 100))).toFixed(2)}</p>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
