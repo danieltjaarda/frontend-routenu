@@ -15,7 +15,8 @@ function Map({
   zoom, 
   startCoordinates, 
   completedStops = new Set(),
-  routeColors = ['#0CC0DF'] // Array van kleuren voor routes
+  routeColors = ['#0CC0DF'], // Array van kleuren voor routes
+  showPopups = true // Option to disable popups
 }) {
   const mapContainer = useRef(null);
   const map = useRef(null);
@@ -56,14 +57,18 @@ function Map({
       el.innerHTML = `<div class="marker-number">S</div>`;
       
       startMarker.current = new mapboxgl.Marker(el)
-        .setLngLat(startCoordinates)
-        .setPopup(
+        .setLngLat(startCoordinates);
+      
+      if (showPopups) {
+        startMarker.current.setPopup(
           new mapboxgl.Popup({ offset: 25 })
             .setHTML(`<strong>Startpunt</strong>`)
-        )
-        .addTo(map.current);
+        );
+      }
+      
+      startMarker.current.addTo(map.current);
     }
-  }, [startCoordinates]);
+  }, [startCoordinates, showPopups]);
 
   // Update markers when routes change (for multiple routes)
   useEffect(() => {
@@ -103,12 +108,16 @@ function Map({
             : `<strong>Stop ${stopIndex + 1}</strong>`;
           
           const marker = new mapboxgl.Marker(el)
-            .setLngLat(stop.coordinates)
-            .setPopup(
+            .setLngLat(stop.coordinates);
+          
+          if (showPopups) {
+            marker.setPopup(
               new mapboxgl.Popup({ offset: 25 })
                 .setHTML(`${popupTitle}<br>${stop.name}${isCompleted ? '<br><span style="color: green;">✓ Voltooid</span>' : ''}`)
-            )
-            .addTo(map.current);
+            );
+          }
+          
+          marker.addTo(map.current);
 
           markers.current.push(marker);
         });
@@ -143,12 +152,16 @@ function Map({
         }
         
         const marker = new mapboxgl.Marker(el)
-          .setLngLat(stop.coordinates)
-          .setPopup(
+          .setLngLat(stop.coordinates);
+        
+        if (showPopups) {
+          marker.setPopup(
             new mapboxgl.Popup({ offset: 25 })
               .setHTML(`<strong>Stop ${index + 1}</strong><br>${stop.name}${isCompleted ? '<br><span style="color: green;">✓ Voltooid</span>' : ''}`)
-          )
-          .addTo(map.current);
+          );
+        }
+        
+        marker.addTo(map.current);
 
         markers.current.push(marker);
       });
@@ -165,7 +178,7 @@ function Map({
         });
       }
     }
-  }, [routes, stops, startCoordinates, completedStops, routeColors]);
+  }, [routes, stops, startCoordinates, completedStops, routeColors, showPopups]);
 
   // Update routes when routes data changes (for multiple routes)
   useEffect(() => {

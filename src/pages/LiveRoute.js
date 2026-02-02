@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { recalculateArrivalTimes, getRouteStopTimestamps, getUserProfile } from '../services/userData';
 import { useAuth } from '../contexts/AuthContext';
+import Map from '../components/Map';
 import './LiveRoute.css';
 
 function LiveRoute() {
@@ -17,6 +18,7 @@ function LiveRoute() {
   const [estimatedArrival, setEstimatedArrival] = useState(null);
   const [targetStopIndex, setTargetStopIndex] = useState(undefined);
   const [userServiceTime, setUserServiceTime] = useState(5); // Default service time
+  const [showRouteMap, setShowRouteMap] = useState(false);
   
   // Find stop index based on email if provided
   useEffect(() => {
@@ -442,7 +444,7 @@ function LiveRoute() {
         {isRouteStarted ? (
           <div className="status-badge started">
             <span className="status-dot"></span>
-            Route is onderweg
+            Monteur is onderweg
           </div>
         ) : (
           <div className="status-badge not-started">
@@ -567,6 +569,48 @@ function LiveRoute() {
       <div className="auto-refresh-note">
         <p>Deze pagina wordt automatisch elke 10 seconden bijgewerkt</p>
       </div>
+      )}
+
+      {/* Route Map Section */}
+      {isRouteStarted && route.stops && route.stops.length > 0 && (
+        <div className="route-map-section">
+          {!showRouteMap ? (
+            <div className="route-map-toggle">
+              <button 
+                className="view-route-btn"
+                onClick={() => setShowRouteMap(true)}
+              >
+                Bekijk route
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="route-map-header">
+                <h2>Route overzicht</h2>
+                <button 
+                  className="close-map-btn"
+                  onClick={() => setShowRouteMap(false)}
+                  aria-label="Sluit kaart"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="route-map-container">
+                <Map
+                  stops={route.stops}
+                  completedStops={new Set(
+                    timestamps
+                      .filter(t => t.actual_arrival_time && t.stop_index >= 0)
+                      .map(t => t.stop_index)
+                  )}
+                  center={route.stops[0]?.coordinates || [5.2913, 52.1326]}
+                  zoom={10}
+                  showPopups={false}
+                />
+              </div>
+            </>
+          )}
+        </div>
       )}
 
       {/* FAQ Section */}
