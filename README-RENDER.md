@@ -32,7 +32,7 @@ Klik op **"Advanced"** en voeg de volgende environment variables toe:
 | Key | Value |
 |-----|-------|
 | `PORT` | `8001` |
-| `RESEND_API_KEY` | `re_iDLLL1LU_NKoUQ1R5oReCnu4AJawE8Sy3` |
+| `RESEND_API_KEY` | `jouw-resend-api-key` |
 | `MAPBOX_SECRET_TOKEN` | `jouw-mapbox-secret-token` |
 | `NODE_ENV` | `production` |
 
