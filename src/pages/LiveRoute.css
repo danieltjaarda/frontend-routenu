@@ -190,14 +190,47 @@
   align-items: center;
 }
 
+.time-info.estimated-arrival {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  background: #FFF3E0;
+  border-radius: 8px;
+  border-left: 3px solid #FF9800;
+}
+
+.estimated-time-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.estimated-time-display {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .time-label {
   font-weight: 500;
   color: #666;
+  font-size: 14px;
+}
+
+.time-info.estimated-arrival .time-label {
+  color: #E65100;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .time-value {
   font-weight: 600;
   color: #333;
+  font-size: 18px;
 }
 
 .time-value.actual {
@@ -206,6 +239,19 @@
 
 .time-value.estimated {
   color: #FF9800;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.time-note {
+  font-size: 13px;
+  color: #666;
+  font-weight: 400;
+}
+
+.time-info.estimated-arrival .time-note {
+  color: #E65100;
+  font-size: 12px;
 }
 
 .delay-info {

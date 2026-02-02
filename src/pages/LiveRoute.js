@@ -433,7 +433,6 @@ function LiveRoute() {
       <div className="live-route-header">
         <img src="/fatbikehulplogo5.avif" alt="Fatbikehulp" className="live-route-logo" />
         <h1>{isRouteStarted ? 'Route Live Bekijken' : 'Route Informatie'}</h1>
-        <p className="route-name">{route.name || 'Route'}</p>
         <p className="route-date">{routeDate}</p>
         {isRouteStarted && (
           <p className="last-update">Laatste update: {lastUpdate.toLocaleTimeString('nl-NL')}</p>
@@ -537,13 +536,17 @@ function LiveRoute() {
                     {/* Show estimated arrival time if not yet arrived */}
                     {!timestamp?.actual_arrival_time && recalculatedTime && (
                       <div className="time-info estimated-arrival">
-                        <span className="time-label">Verwachte aankomsttijd:</span>
-                        <span className="time-value estimated">
-                          {recalculatedTime.arrival}
-                        </span>
-                        {recalculatedTime.estimatedMinutes > 0 && (
-                          <span className="time-note">(over ongeveer {recalculatedTime.estimatedMinutes} minuten)</span>
-                        )}
+                        <div className="estimated-time-content">
+                          <span className="time-label">Verwachte aankomsttijd</span>
+                          <div className="estimated-time-display">
+                            <span className="time-value estimated">
+                              {recalculatedTime.arrival}
+                            </span>
+                            {recalculatedTime.estimatedMinutes > 0 && (
+                              <span className="time-note">Over ongeveer {recalculatedTime.estimatedMinutes} minuten</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     )}
                     
