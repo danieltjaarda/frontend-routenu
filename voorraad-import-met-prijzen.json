@@ -1,0 +1,33 @@
+[
+  {
+    "naam": "Hydraulische rem (voor)",
+    "aantal": 50,
+    "categorie": "Remmen",
+    "prijs_per_stuk": "23.29"
+  },
+  {
+    "naam": "Hydraulische rem (achter)",
+    "aantal": 100,
+    "categorie": "Remmen",
+    "prijs_per_stuk": "23.29"
+  },
+  {
+    "naam": "Rubberen handvatset",
+    "aantal": 10,
+    "categorie": "Onderdelen",
+    "prijs_per_stuk": "2.91"
+  },
+  {
+    "naam": "V8 accu-laadpoort",
+    "aantal": 5,
+    "categorie": "Accu",
+    "prijs_per_stuk": "2.33"
+  },
+  {
+    "naam": "Accuslot",
+    "aantal": 10,
+    "categorie": "Accu",
+    "prijs_per_stuk": "8.73"
+  }
+]
+

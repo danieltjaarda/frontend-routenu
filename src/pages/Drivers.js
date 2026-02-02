@@ -362,17 +362,29 @@ function Drivers() {
                 <th>Telefoonnummer</th>
                 <th>Rijbewijsnummer</th>
                 <th>Uurtarief</th>
+                <th>Beschikbare dagen</th>
                 <th>Acties</th>
               </tr>
             </thead>
             <tbody>
-              {drivers.map((driver) => (
+              {drivers.map((driver) => {
+                // Format available days for display
+                const dayNames = ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za'];
+                const availableDays = driver.available_days || [];
+                const availableDaysDisplay = availableDays.length > 0 
+                  ? availableDays.map(day => dayNames[day]).join(', ')
+                  : '-';
+                
+                return (
                 <tr key={driver.id} className="route-row">
                   <td className="route-name">{driver.name || 'Chauffeur zonder naam'}</td>
                   <td>{driver.email || '-'}</td>
                   <td>{driver.phone || '-'}</td>
                   <td>{driver.license_number || '-'}</td>
                   <td>{driver.hourly_rate ? `€${parseFloat(driver.hourly_rate).toFixed(2)}` : '-'}</td>
+                  <td style={{ fontSize: '13px', color: availableDays.length > 0 ? '#1d1d1f' : '#86868b' }}>
+                    {availableDaysDisplay}
+                  </td>
                   <td className="actions-cell" onClick={(e) => e.stopPropagation()}>
                     <div className="action-buttons">
                       <button 
@@ -405,7 +417,8 @@ function Drivers() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         ) : (

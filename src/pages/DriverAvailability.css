@@ -1,0 +1,249 @@
+.driver-availability-page {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.page-header {
+  margin-bottom: 32px;
+}
+
+.page-header h1 {
+  margin: 0 0 8px 0;
+  font-size: 28px;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.page-header p {
+  margin: 0;
+  color: #86868b;
+  font-size: 15px;
+}
+
+.availability-controls {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+
+.driver-selector,
+.week-selector {
+  flex: 1;
+  min-width: 200px;
+}
+
+.driver-selector label,
+.week-selector label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1d1d1f;
+}
+
+.driver-selector select,
+.week-selector select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #e5e5e7;
+  border-radius: 8px;
+  font-size: 15px;
+  background: white;
+  color: #1d1d1f;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.driver-selector select:focus,
+.week-selector select:focus {
+  outline: none;
+  border-color: #007AFF;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+}
+
+.availability-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.driver-info-card {
+  background: white;
+  border: 1px solid #e5e5e7;
+  border-radius: 12px;
+  padding: 20px 24px;
+}
+
+.driver-info-card h2 {
+  margin: 0 0 4px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.driver-info-card p {
+  margin: 0;
+  color: #86868b;
+  font-size: 15px;
+}
+
+.week-availability-card {
+  background: white;
+  border: 1px solid #e5e5e7;
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.week-availability-card h3 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.availability-details {
+  margin-top: 16px;
+}
+
+.no-availability {
+  text-align: center;
+  padding: 40px 20px;
+  color: #86868b;
+}
+
+.no-availability p {
+  margin: 0;
+  font-size: 15px;
+}
+
+.availability-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.availability-day {
+  padding: 16px;
+  border: 1px solid #e5e5e7;
+  border-radius: 8px;
+  background: white;
+}
+
+.availability-day.available {
+  border-color: #34C759;
+  background: #f0f9f4;
+}
+
+.availability-day.not-available {
+  border-color: #e5e5e7;
+  background: #f5f5f7;
+  opacity: 0.6;
+}
+
+.day-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1d1d1f;
+  margin-bottom: 8px;
+}
+
+.day-time {
+  font-size: 14px;
+  color: #86868b;
+}
+
+.availability-day.available .day-time {
+  color: #34C759;
+  font-weight: 500;
+}
+
+.all-weeks-summary {
+  background: white;
+  border: 1px solid #e5e5e7;
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.all-weeks-summary h3 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.weeks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.week-summary-item {
+  padding: 16px;
+  border: 1px solid #e5e5e7;
+  border-radius: 8px;
+  background: white;
+}
+
+.week-summary-item.current-week {
+  border-color: #007AFF;
+  background: #f0f9ff;
+}
+
+.week-header-summary {
+  margin-bottom: 8px;
+}
+
+.week-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.week-availability-summary {
+  font-size: 14px;
+  color: #86868b;
+  line-height: 1.5;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 64px 24px;
+  background: white;
+  border: 1px solid #e5e5e7;
+  border-radius: 12px;
+}
+
+.empty-state p {
+  margin: 0 0 8px 0;
+  color: #86868b;
+  font-size: 15px;
+}
+
+.empty-hint {
+  color: #86868b;
+  font-size: 14px;
+}
+
+.loading-message {
+  text-align: center;
+  padding: 48px 20px;
+  font-size: 15px;
+  color: #86868b;
+}
+
+@media (max-width: 768px) {
+  .driver-availability-page {
+    padding: 16px;
+  }
+
+  .availability-controls {
+    flex-direction: column;
+  }
+
+  .availability-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

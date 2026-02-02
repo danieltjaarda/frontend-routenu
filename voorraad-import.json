@@ -1,0 +1,98 @@
+[
+  {
+    "naam": "V20 accu",
+    "aantal": 1,
+    "categorie": "Accu"
+  },
+  {
+    "naam": "Voorvork",
+    "aantal": 5,
+    "categorie": "Onderdelen"
+  },
+  {
+    "naam": "Ketting",
+    "aantal": 6,
+    "categorie": "Onderdelen"
+  },
+  {
+    "naam": "Remblokken",
+    "aantal": 50,
+    "categorie": "Remmen"
+  },
+  {
+    "naam": "Logan remmenset LINKS",
+    "aantal": 20,
+    "categorie": "Remmen"
+  },
+  {
+    "naam": "Logan remmenset RECHTS",
+    "aantal": 20,
+    "categorie": "Remmen"
+  },
+  {
+    "naam": "H6C display",
+    "aantal": 14,
+    "categorie": "Display"
+  },
+  {
+    "naam": "Motortandwiel 36T (500W)",
+    "aantal": 5,
+    "categorie": "Motor"
+  },
+  {
+    "naam": "Trapkrachtsensor",
+    "aantal": 70,
+    "categorie": "Sensor"
+  },
+  {
+    "naam": "Accurail",
+    "aantal": 5,
+    "categorie": "Onderdelen"
+  },
+  {
+    "naam": "Verende schokdemper",
+    "aantal": 5,
+    "categorie": "Onderdelen"
+  },
+  {
+    "naam": "Trapas",
+    "aantal": 4,
+    "categorie": "Onderdelen"
+  },
+  {
+    "naam": "Mini buitenband",
+    "aantal": 30,
+    "categorie": "Banden"
+  },
+  {
+    "naam": "Mini binnenband",
+    "aantal": 60,
+    "categorie": "Banden"
+  },
+  {
+    "naam": "Logan hydraulische rem (voor)",
+    "aantal": 50,
+    "categorie": "Remmen"
+  },
+  {
+    "naam": "Logan hydraulische rem links/rechts",
+    "aantal": 100,
+    "categorie": "Remmen"
+  },
+  {
+    "naam": "Rubberen handvatsets",
+    "aantal": 10,
+    "categorie": "Onderdelen"
+  },
+  {
+    "naam": "V8 accu-laadpoort",
+    "aantal": 5,
+    "categorie": "Accu"
+  },
+  {
+    "naam": "Accuslot",
+    "aantal": 10,
+    "categorie": "Accu"
+  }
+]
+

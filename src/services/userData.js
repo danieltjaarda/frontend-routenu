@@ -430,7 +430,7 @@ export const getUserDrivers = async (userId) => {
       // Use a simple query that checks if column exists by trying to select it
       const { data: adminDriversData, error: adminError } = await supabase
         .from('drivers')
-        .select('id, user_id, name, email, phone, license_number, admin_user_id, created_at, updated_at')
+        .select('id, user_id, name, email, phone, license_number, admin_user_id, available_days, availability_schedule, hourly_rate, created_at, updated_at')
         .eq('admin_user_id', userId)
         .order('created_at', { ascending: false });
 

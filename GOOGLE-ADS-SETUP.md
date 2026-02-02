@@ -137,3 +137,6 @@ Voor productie data heb je een **APPROVED** developer token nodig:
 - Vraag aan via Google Ads API Center
 - Vereist OAuth consent screen verificatie
 
+
+
+

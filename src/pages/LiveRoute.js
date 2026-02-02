@@ -568,6 +568,33 @@ function LiveRoute() {
         <p>Deze pagina wordt automatisch elke 10 seconden bijgewerkt</p>
       </div>
       )}
+
+      {/* FAQ Section */}
+      <div className="faq-section">
+        <h2>Veelgestelde vragen</h2>
+        <div className="faq-list">
+          <div className="faq-item">
+            <h3 className="faq-question">Belt de monteur mij?</h3>
+            <p className="faq-answer">Ja, de monteur belt u 1 uur van tevoren.</p>
+          </div>
+          
+          <div className="faq-item">
+            <h3 className="faq-question">Kan het tijdstip afwijken?</h3>
+            <p className="faq-answer">
+              Ja, het tijdstip kan afwijken. Bij elke stop die de monteur afrondt wordt de route herberekend. 
+              Het kan zijn dat het daadwerkelijke tijdstip wel 3 uur later is dan oorspronkelijk gepland.
+            </p>
+          </div>
+          
+          <div className="faq-item">
+            <h3 className="faq-question">Moet ik er om thuis blijven?</h3>
+            <p className="faq-answer">
+              Nee, u hoeft er niet om thuis te blijven. U wordt 1 uur van tevoren gebeld, 
+              dus u kunt gerust naar de supermarkt of andere boodschappen doen.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

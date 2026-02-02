@@ -8,7 +8,7 @@ const { google } = require('googleapis');
 const app = express();
 const PORT = process.env.PORT || 8001;
 const RESEND_API_KEY = process.env.RESEND_API_KEY || 're_iDLLL1LU_NKoUQ1R5oReCnu4AJawE8Sy3';
-const MAPBOX_SECRET_TOKEN = process.env.MAPBOX_SECRET_TOKEN || 'process.env.MAPBOX_SECRET_TOKEN || ""';
+const MAPBOX_SECRET_TOKEN = process.env.MAPBOX_SECRET_TOKEN || '';
 
 // Google Ads Configuration
 const GOOGLE_ADS_CLIENT_ID = process.env.GOOGLE_ADS_CLIENT_ID;

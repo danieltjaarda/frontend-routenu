@@ -1,0 +1,122 @@
+[
+  {
+    "naam": "Hydraulische rem links",
+    "aantal": 70,
+    "categorie": "Remmen",
+    "prijs_per_stuk": "23.29"
+  },
+  {
+    "naam": "Hydraulische rem rechts",
+    "aantal": 120,
+    "categorie": "Remmen",
+    "prijs_per_stuk": "23.29"
+  },
+  {
+    "naam": "Rubberen handvatset",
+    "aantal": 10,
+    "categorie": "Onderdelen",
+    "prijs_per_stuk": "2.91"
+  },
+  {
+    "naam": "V20 accu",
+    "aantal": 1,
+    "categorie": "Accu",
+    "prijs_per_stuk": "120.00"
+  },
+  {
+    "naam": "V8 accu-laadpoort",
+    "aantal": 5,
+    "categorie": "Accu",
+    "prijs_per_stuk": "2.33"
+  },
+  {
+    "naam": "Accuslot",
+    "aantal": 10,
+    "categorie": "Accu",
+    "prijs_per_stuk": "8.73"
+  },
+  {
+    "naam": "Voorvork",
+    "aantal": 5,
+    "categorie": "Onderdelen",
+    "prijs_per_stuk": "28.00"
+  },
+  {
+    "naam": "Ketting",
+    "aantal": 6,
+    "categorie": "Onderdelen",
+    "prijs_per_stuk": "3.00"
+  },
+  {
+    "naam": "Remblokken",
+    "aantal": 50,
+    "categorie": "Remmen",
+    "prijs_per_stuk": "1.00"
+  },
+  {
+    "naam": "H6C display",
+    "aantal": 14,
+    "categorie": "Display",
+    "prijs_per_stuk": "22.00"
+  },
+  {
+    "naam": "Motortandwiel 36T (500W)",
+    "aantal": 5,
+    "categorie": "Motor",
+    "prijs_per_stuk": "8.00"
+  },
+  {
+    "naam": "Trapkrachtsensor",
+    "aantal": 70,
+    "categorie": "Sensor",
+    "prijs_per_stuk": "3.00"
+  },
+  {
+    "naam": "Accuhouder V20",
+    "aantal": 5,
+    "categorie": "Accu",
+    "prijs_per_stuk": "8.00"
+  },
+  {
+    "naam": "Verende schokdemper",
+    "aantal": 5,
+    "categorie": "Onderdelen",
+    "prijs_per_stuk": "6.00"
+  },
+  {
+    "naam": "Trapas",
+    "aantal": 4,
+    "categorie": "Onderdelen",
+    "prijs_per_stuk": "6.00"
+  },
+  {
+    "naam": "Mini buitenband",
+    "aantal": 30,
+    "categorie": "Banden",
+    "prijs_per_stuk": "11.00"
+  },
+  {
+    "naam": "Mini binnenband",
+    "aantal": 60,
+    "categorie": "Banden",
+    "prijs_per_stuk": "3.00"
+  },
+  {
+    "naam": "250W tandwiel",
+    "aantal": 20,
+    "categorie": "Motor",
+    "prijs_per_stuk": "7.00"
+  },
+  {
+    "naam": "Kenda binnen- en buitenband (set)",
+    "aantal": 50,
+    "categorie": "Banden",
+    "prijs_per_stuk": "13.00"
+  },
+  {
+    "naam": "V20 controller",
+    "aantal": 10,
+    "categorie": "Motor",
+    "prijs_per_stuk": "20.00"
+  }
+]

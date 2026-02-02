@@ -1,3 +1,4 @@
+/* Desktop Sidebar */
 .sidebar-menu {
   position: fixed;
   left: 0;
@@ -12,6 +13,7 @@
   padding: 12px 0;
   z-index: 1000;
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+  transition: transform 0.3s ease;
 }
 
 .menu-items {
@@ -35,6 +37,10 @@
   transition: all 0.2s;
   position: relative;
   color: #9E9E9E;
+}
+
+.menu-label {
+  display: none;
 }
 
 .menu-tooltip {
@@ -109,6 +115,9 @@
 .menu-user {
   margin-top: auto;
   padding-bottom: 12px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
 }
 
 .user-button {
@@ -123,9 +132,219 @@
   cursor: pointer;
   transition: all 0.2s;
   color: white;
+  position: relative;
 }
 
 .user-button:hover {
   background: #CE93D8;
 }
 
+.user-button.active {
+  background: #0CC0DF;
+}
+
+/* Mobile hamburger button - hidden on desktop */
+.mobile-menu-toggle {
+  display: none;
+}
+
+/* Mobile menu header - hidden on desktop */
+.mobile-menu-header {
+  display: none;
+}
+
+/* Mobile overlay - hidden on desktop */
+.mobile-menu-overlay {
+  display: none;
+}
+
+/* Mobile Styles */
+@media (max-width: 768px) {
+  /* Hide sidebar by default on mobile */
+  .sidebar-menu {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    width: 280px;
+    transform: translateX(-100%);
+    z-index: 1001;
+    padding: 0;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Show sidebar when open */
+  .sidebar-menu.mobile-open {
+    transform: translateX(0);
+  }
+
+  /* Mobile menu header */
+  .mobile-menu-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #e1e3e5;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .mobile-logo {
+    height: 32px;
+  }
+
+  .mobile-close-btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #6d7175;
+    transition: all 0.15s;
+  }
+
+  .mobile-close-btn:hover {
+    background: #f6f6f7;
+    color: #1a1a1a;
+  }
+
+  /* Hamburger toggle button */
+  .mobile-menu-toggle {
+    display: flex;
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 1002;
+    width: 44px;
+    height: 44px;
+    border: none;
+    background: white;
+    border-radius: 12px;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+    color: #1a1a1a;
+    transition: all 0.2s;
+  }
+
+  .mobile-menu-toggle:hover {
+    background: #f6f6f7;
+  }
+
+  .mobile-menu-toggle:active {
+    transform: scale(0.95);
+  }
+
+  /* Mobile overlay */
+  .mobile-menu-overlay {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    animation: fadeIn 0.2s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* Menu items styling for mobile */
+  .menu-items {
+    padding: 16px;
+    gap: 4px;
+    align-items: stretch;
+  }
+
+  .menu-item {
+    width: 100%;
+    height: auto;
+    padding: 14px 16px;
+    justify-content: flex-start;
+    gap: 14px;
+    border-radius: 10px;
+  }
+
+  .menu-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+
+  .menu-label {
+    display: block;
+    font-size: 15px;
+    font-weight: 500;
+    color: inherit;
+  }
+
+  .menu-tooltip {
+    display: none;
+  }
+
+  .menu-item:hover {
+    background: #f6f6f7;
+  }
+
+  .menu-item.active {
+    background: #0CC0DF;
+    color: white;
+  }
+
+  .menu-item.active .menu-label {
+    color: white;
+  }
+
+  /* User button on mobile */
+  .menu-user {
+    padding: 16px;
+    border-top: 1px solid #e1e3e5;
+    margin-top: auto;
+  }
+
+  .user-button {
+    width: 100%;
+    height: auto;
+    padding: 14px 16px;
+    justify-content: flex-start;
+    gap: 14px;
+    border-radius: 10px;
+  }  .user-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .user-button .menu-label {
+    display: block;
+    font-size: 15px;
+    font-weight: 500;
+    color: white;
+  }
+
+  .user-button .menu-tooltip {
+    display: none;
+  }
+}
+
+/* Adjust content margin on mobile when menu is hidden */
+@media (max-width: 768px) {
+  /* The main content area needs to account for no sidebar */
+  .app-content,
+  .main-content {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+  }
+}

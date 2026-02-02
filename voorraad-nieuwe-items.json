@@ -1,0 +1,21 @@
+[
+  {
+    "naam": "250W tandwiel",
+    "aantal": 20,
+    "categorie": "Motor",
+    "prijs_per_stuk": "7.00"
+  },
+  {
+    "naam": "Kenda binnen- en buitenband (set)",
+    "aantal": 50,
+    "categorie": "Banden",
+    "prijs_per_stuk": "13.00"
+  },
+  {
+    "naam": "V20 controller",
+    "aantal": 10,
+    "categorie": "Motor",
+    "prijs_per_stuk": "20.00"
+  }
+]
+
