@@ -429,7 +429,7 @@ function LiveRoute() {
   return (
     <div className="live-route-page">
       <div className="live-route-header">
-        <img src="/logo.png" alt="RouteNu" className="live-route-logo" />
+        <img src="/fatbikehulplogo5.avif" alt="Fatbikehulp" className="live-route-logo" />
         <h1>{isRouteStarted ? 'Route Live Bekijken' : 'Route Informatie'}</h1>
         <p className="route-name">{route.name || 'Route'}</p>
         <p className="route-date">{routeDate}</p>
