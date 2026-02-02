@@ -430,7 +430,7 @@ export const getUserDrivers = async (userId) => {
       // Use a simple query that checks if column exists by trying to select it
       const { data: adminDriversData, error: adminError } = await supabase
         .from('drivers')
-        .select('id, user_id, name, email, phone, license_number, admin_user_id, available_days, availability_schedule, hourly_rate, created_at, updated_at')
+        .select('id, user_id, name, email, phone, license_number, admin_user_id, created_at, updated_at')
         .eq('admin_user_id', userId)
         .order('created_at', { ascending: false });
 
@@ -896,6 +896,40 @@ export const getUserMonthlyCosts = async (userId) => {
     return data || [];
   } catch (error) {
     console.error('Error getting monthly costs:', error);
+    throw error;
+  }
+};
+
+// Get all picked up bikes for user (admin view)
+export const getPickedUpBikes = async (userId) => {
+  try {
+    const { data, error } = await supabase
+      .from('picked_up_bikes')
+      .select('*')
+      .eq('user_id', userId)
+      .order('picked_up_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error getting picked up bikes:', error);
+    throw error;
+  }
+};
+
+// Get picked up bikes for driver (mechanic portal)
+export const getPickedUpBikesForDriver = async (driverId) => {
+  try {
+    const { data, error } = await supabase
+      .from('picked_up_bikes')
+      .select('*')
+      .eq('driver_id', driverId)
+      .order('picked_up_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error getting picked up bikes for driver:', error);
     throw error;
   }
 };

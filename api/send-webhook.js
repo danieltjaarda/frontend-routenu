@@ -110,6 +110,23 @@ module.exports = async (req, res) => {
         start_coordinates: data.start_coordinates || data.startCoordinates || null,
         registration_date: data.registration_date || data.registrationDate || new Date().toISOString()
       };
+    } else if (templateType === 'fiets-opgehaald') {
+      payload = {
+        ...payload,
+        event: 'bike_picked_up',
+        route_id: data.route_id || '',
+        route_name: data.route_name || '',
+        route_date: data.route_date || '',
+        stop_index: data.stop_index !== undefined ? data.stop_index : null,
+        stop_name: data.stop_name || '',
+        stop_email: data.stop_email || '',
+        stop_phone: data.stop_phone || '',
+        stop_address: data.stop_address || '',
+        stop_coordinates: data.stop_coordinates || null,
+        driver_id: data.driver_id || '',
+        driver_name: data.driver_name || '',
+        picked_up_at: data.picked_up_at || new Date().toISOString()
+      };
     }
 
     console.log('Sending webhook to:', webhookUrl, 'with payload:', payload);

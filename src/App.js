@@ -20,9 +20,8 @@ import Profile from './pages/Profile';
 import DriverLogin from './pages/DriverLogin';
 import DriverDashboard from './pages/DriverDashboard';
 import Drivers from './pages/Drivers';
-import Inventory from './pages/Inventory';
-import DriverAvailability from './pages/DriverAvailability';
 import Checkout from './pages/Checkout';
+import PickedUpBikes from './pages/PickedUpBikes';
 import { 
   getUserVehicles, 
   getUserOrders, 
@@ -39,8 +38,7 @@ import {
 import './App.css';
 
 // Secret token voor API calls (Optimization, Directions)
-// Set via environment variable MAPBOX_SECRET_TOKEN
-const MAPBOX_SECRET_TOKEN = process.env.MAPBOX_SECRET_TOKEN || '';
+const MAPBOX_SECRET_TOKEN = 'sk.eyJ1IjoiZmF0YmlrZWh1bHAiLCJhIjoiY21qNnhqdXdjMDExcDNkczZrNmN6ZGtkcCJ9._qbrsDUZpEOR97cAI17-hA';
 
 // Public token voor Mapbox GL JS (kaart)
 const MAPBOX_PUBLIC_TOKEN = process.env.REACT_APP_MAPBOX_PUBLIC_TOKEN || 'pk.eyJ1IjoiZmF0YmlrZWh1bHAiLCJhIjoiY21qNnhmanp5MDB4ajNncjB1YXJrMDc2cSJ9.5CYl4ZfCROi-pmyaNzETIg';
@@ -660,15 +658,13 @@ function AppContent() {
           geometry: routeData.geometry,
           distance: routeData.distance,
           duration: routeData.duration,
-          waypoints: data.waypoints,
-          service_time: userProfile?.service_time || 5
+          waypoints: data.waypoints
         };
         
         console.log('Route calculated (handleCalculateRoute), setting route state', {
           hasGeometry: !!calculatedRoute.geometry,
           coordinatesCount: calculatedRoute.geometry?.coordinates?.length,
-          distance: calculatedRoute.distance,
-          service_time: calculatedRoute.service_time
+          distance: calculatedRoute.distance
         });
         
         // Set route state first (so Map component can render it immediately)
@@ -710,97 +706,54 @@ function AppContent() {
         return;
       }
 
-      // Check if we have more than 10 stops (Mapbox Optimization API limit is 12 including start/end)
-      if (stops.length > 10) {
-        alert('Route optimalisatie ondersteunt maximaal 10 stops. Gebruik "Volgorde behouden" voor meer stops.');
-        setIsOptimizing(false);
-        return;
-      }
-
-      // Build waypoints array: startpoint + all stops (no endpoint needed, roundtrip=true handles return)
-      const waypoints = [
-        { coordinates: startCoordinates },
-        ...stops.map(stop => ({ coordinates: stop.coordinates }))
-      ];
-
-      console.log('Calling optimize-route API with waypoints:', waypoints.length);
-
-      // Call backend Optimization API endpoint
-      const response = await fetch(`${API_BASE_URL}/api/optimize-route`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          waypoints,
-          profile: 'driving'
-        })
-      });
+      // Format: startpoint;stop1;stop2;...;startpoint (startpoint first, then stops, then back to start)
+      const stopCoordinates = stops.map(stop => `${stop.coordinates[0]},${stop.coordinates[1]}`).join(';');
+      const coordinates = `${startCoordinates[0]},${startCoordinates[1]};${stopCoordinates};${startCoordinates[0]},${startCoordinates[1]}`;
+      
+      // Gebruik Directions API met public token (werkt vanuit browser)
+      // Voor meerdere stops gebruiken we waypoints
+      const response = await fetch(
+        `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?` +
+        `access_token=${MAPBOX_PUBLIC_TOKEN}&` +
+        `geometries=geojson&` +
+        `overview=full&` +
+        `steps=true&` +
+        `annotations=duration,distance`
+      );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || errorData.message || 'Route optimalisatie mislukt');
+        throw new Error(errorData.message || 'Route optimalisatie mislukt');
       }
 
       const data = await response.json();
       
-      // Optimization API response
+      // Directions API response
       if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
         const routeData = data.routes[0];
-        
-        // Reorder stops based on optimized waypoint order
-        // waypoints array from optimization API contains waypoint_index which indicates new order
-        // Index 0 is the start point, so we skip it
-        const optimizedWaypoints = data.waypoints || [];
-        
-        console.log('Optimization API response waypoints:', optimizedWaypoints.map(wp => ({
-          waypoint_index: wp.waypoint_index,
-          location: wp.location
-        })));
-
-        // Create mapping from original index to optimized index
-        // waypoint_index tells us the position in the optimized route
-        // Skip index 0 (start point) and get stops in optimized order
-        const stopsWithOptimizedOrder = optimizedWaypoints
-          .slice(1) // Skip start point
-          .map((wp, originalIdx) => ({
-            originalIndex: originalIdx,
-            optimizedIndex: wp.waypoint_index - 1, // -1 because start point is at index 0
-            stop: stops[originalIdx]
-          }))
-          .sort((a, b) => a.optimizedIndex - b.optimizedIndex)
-          .map(item => item.stop);
-
-        console.log('Reordered stops:', stopsWithOptimizedOrder.map(s => s.name || s.address));
-
-        // Update stops with optimized order
-        setStops(stopsWithOptimizedOrder);
-
         const calculatedRoute = {
           geometry: routeData.geometry,
           distance: routeData.distance,
           duration: routeData.duration,
-          waypoints: optimizedWaypoints,
-          service_time: userProfile?.service_time || 5
+          waypoints: data.waypoints
         };
         
-        console.log('Route optimized (handleOptimizeRoute), setting route state', {
+        console.log('Route calculated (handleOptimizeRoute), setting route state', {
           hasGeometry: !!calculatedRoute.geometry,
           coordinatesCount: calculatedRoute.geometry?.coordinates?.length,
-          distance: calculatedRoute.distance,
-          service_time: calculatedRoute.service_time,
-          originalDistance: 'see previous route'
+          distance: calculatedRoute.distance
         });
         
         // Set route state first (so Map component can render it immediately)
+        // Use a new object reference to ensure React detects the change
         setRoute({ ...calculatedRoute });
 
-        // Auto-save route with calculated route data and reordered stops
-        autoSaveRoute(stopsWithOptimizedOrder, calculatedRoute, null).catch(err => {
+        // Auto-save route with calculated route data (async, doesn't block rendering)
+        autoSaveRoute(stops, calculatedRoute, null).catch(err => {
           console.error('Error auto-saving route:', err);
         });
       } else {
-        throw new Error(data.message || 'Geen geoptimaliseerde route gevonden');
+        throw new Error(data.message || 'Geen route gevonden');
       }
     } catch (error) {
       console.error('Route optimalisatie error:', error);
@@ -1038,14 +991,6 @@ function AppContent() {
             } 
           />
           <Route 
-            path="/voorraad" 
-            element={
-              <ProtectedRoute>
-                <Inventory />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
             path="/berichten" 
             element={
               <ProtectedRoute>
@@ -1062,10 +1007,18 @@ function AppContent() {
             } 
           />
           <Route 
-            path="/beschikbaarheid" 
+            path="/opgehaalde-fietsen" 
             element={
               <ProtectedRoute>
-                <DriverAvailability />
+                <PickedUpBikes />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/nieuwe" 
+            element={
+              <ProtectedRoute>
+                <PickedUpBikes />
               </ProtectedRoute>
             } 
           />
@@ -1143,7 +1096,6 @@ function AppContent() {
                         isOptimizing={isOptimizing}
                         departureTime={departureTime}
                         onDepartureTimeChange={setDepartureTime}
-                        serviceTime={userProfile?.service_time || 5}
                         currentRouteId={currentRouteId}
                         routeName={selectedRouteDate ? `Route ${new Date(selectedRouteDate).toLocaleDateString('nl-NL')}` : 'Route'}
                         routeDate={selectedRouteDate}

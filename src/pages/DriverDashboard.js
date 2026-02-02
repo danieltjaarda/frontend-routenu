@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { getEmailTemplate, sendWebhook, getRouteStopTimestamps, recalculateArrivalTimes } from '../services/userData';
+import { getEmailTemplate, sendWebhook, getRouteStopTimestamps, recalculateArrivalTimes, getPickedUpBikesForDriver } from '../services/userData';
 import Map from '../components/Map';
 import './DriverDashboard.css';
 
@@ -22,16 +22,11 @@ function DriverDashboard() {
   const [showStopModal, setShowStopModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showRouteOverview, setShowRouteOverview] = useState(false);
-  const [isContinuingRoute, setIsContinuingRoute] = useState(false);
   const [routeTimestamps, setRouteTimestamps] = useState([]);
   const [hoursWorked, setHoursWorked] = useState('');
   const [kilometersDriven, setKilometersDriven] = useState('');
-  const [completedStopsByRoute, setCompletedStopsByRoute] = useState({});
-  const [availableDays, setAvailableDays] = useState([]);
-  const [showAvailableDaysModal, setShowAvailableDaysModal] = useState(false);
-  const [savingAvailableDays, setSavingAvailableDays] = useState(false);
-  const [availabilitySchedule, setAvailabilitySchedule] = useState({});
-  const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
+  const [selectedPickedUpStops, setSelectedPickedUpStops] = useState([]);
+  const [pickedUpBikes, setPickedUpBikes] = useState([]);
 
   useEffect(() => {
     const loadDriverData = async () => {
@@ -41,34 +36,26 @@ function DriverDashboard() {
       }
 
       try {
-        // Load driver profile (including balance and total_hours)
+        // Load driver profile
         const { data: driverData, error: driverError } = await supabase
           .from('drivers')
-          .select('id, user_id, name, email, phone, license_number, balance, total_hours, hourly_rate, admin_user_id, available_days, availability_schedule, created_at, updated_at')
+          .select('*')
           .eq('user_id', currentUser.id)
           .single();
 
-        if (driverError) {
-          // If driver doesn't exist (PGRST116 = no rows returned), redirect to admin login
+        if (driverError && driverError.code !== 'PGRST116') {
+          console.error('Error loading driver:', driverError);
+          // If driver doesn't exist, redirect to admin login
           if (driverError.code === 'PGRST116') {
             alert('Je bent niet geregistreerd als chauffeur. Log in als admin.');
             logout();
             window.location.href = '/login';
             return;
           }
-          // Other errors
-          console.error('Error loading driver:', driverError);
-          alert('Fout bij het laden van chauffeur gegevens: ' + driverError.message);
-          setLoading(false);
-          return;
         }
 
         if (driverData) {
           setDriver(driverData);
-          // Set available days from driver data (default to empty array if not set)
-          setAvailableDays(driverData.available_days || []);
-          // Set availability schedule (default to empty object if not set)
-          setAvailabilitySchedule(driverData.availability_schedule || {});
 
           // Load routes assigned to this driver (vandaag en toekomstig)
           // Use local date to avoid timezone issues
@@ -77,19 +64,6 @@ function DriverDashboard() {
           const month = String(today.getMonth() + 1).padStart(2, '0');
           const day = String(today.getDate()).padStart(2, '0');
           const todayStr = `${year}-${month}-${day}`; // Format: YYYY-MM-DD (local time)
-
-          // Reload driver to get latest balance and total_hours
-          const { data: updatedDriver, error: driverUpdateError } = await supabase
-            .from('drivers')
-            .select('id, user_id, name, email, phone, license_number, balance, total_hours, hourly_rate')
-            .eq('id', driverData.id)
-            .single();
-
-          if (!driverUpdateError && updatedDriver) {
-            setDriver(updatedDriver);
-          } else {
-            setDriver(driverData);
-          }
 
           const { data: routesData, error: routesError } = await supabase
             .from('routes')
@@ -103,31 +77,14 @@ function DriverDashboard() {
           } else {
             console.log('Loaded routes for driver:', routesData);
             setRoutes(routesData || []);
-            
-            // Load completed stops for all routes
-            const completedStopsData = {};
-            if (routesData && routesData.length > 0) {
-              for (const route of routesData) {
-                if (route.id) {
-                  try {
-                    const { data: stopDetails } = await supabase
-                      .from('route_stop_details')
-                      .select('stop_index')
-                      .eq('route_id', route.id);
-                    
-                    if (stopDetails) {
-                      completedStopsData[route.id] = new Set(stopDetails.map(detail => detail.stop_index));
-                    } else {
-                      completedStopsData[route.id] = new Set();
-                    }
-                  } catch (error) {
-                    console.error('Error loading stop details for route:', route.id, error);
-                    completedStopsData[route.id] = new Set();
-                  }
-                }
-              }
-            }
-            setCompletedStopsByRoute(completedStopsData);
+          }
+
+          // Load picked up bikes for this driver
+          try {
+            const bikesData = await getPickedUpBikesForDriver(driverData.id);
+            setPickedUpBikes(bikesData || []);
+          } catch (bikesError) {
+            console.error('Error loading picked up bikes:', bikesError);
           }
         }
       } catch (error) {
@@ -156,9 +113,7 @@ function DriverDashboard() {
         detailsMap[detail.stop_index] = {
           workDescription: detail.work_description || '',
           amountReceived: detail.amount_received?.toString() || '',
-          partsCost: detail.parts_cost?.toString() || '',
-          paymentToDriver: detail.payment_to_driver || false,
-          selectedParts: detail.selected_parts || []
+          partsCost: detail.parts_cost?.toString() || ''
         };
       });
 
@@ -763,60 +718,6 @@ function DriverDashboard() {
 
       const now = new Date().toISOString();
 
-      // Get existing stop detail to check if payment_to_driver was changed
-      const { data: existingDetail } = await supabase
-        .from('route_stop_details')
-        .select('payment_to_driver, amount_received')
-        .eq('route_id', activeRoute.id)
-        .eq('stop_index', stopIndex)
-        .single();
-
-      const wasPaymentToDriver = existingDetail?.payment_to_driver || false;
-      const oldAmount = existingDetail?.amount_received || 0;
-      const newAmount = details.amountReceived ? parseFloat(details.amountReceived) : 0;
-      const isPaymentToDriver = details.paymentToDriver || false;
-
-      // Get route owner ID to update inventory
-      const { data: routeData } = await supabase
-        .from('routes')
-        .select('user_id')
-        .eq('id', activeRoute.id)
-        .single();
-
-      const routeOwnerId = routeData?.user_id;
-
-      // Update inventory - deduct parts from stock
-      if (details.selectedParts && details.selectedParts.length > 0 && routeOwnerId) {
-        for (const selectedPart of details.selectedParts) {
-          try {
-            // Get current quantity
-            const { data: currentPart, error: partError } = await supabase
-              .from('inventory')
-              .select('quantity')
-              .eq('id', selectedPart.id)
-              .eq('user_id', routeOwnerId)
-              .single();
-
-            if (!partError && currentPart) {
-              const newQuantity = Math.max(0, (currentPart.quantity || 0) - (selectedPart.quantity || 0));
-              
-              // Update inventory quantity
-              const { error: updateError } = await supabase
-                .from('inventory')
-                .update({ quantity: newQuantity })
-                .eq('id', selectedPart.id)
-                .eq('user_id', routeOwnerId);
-
-              if (updateError) {
-                console.error('Error updating inventory for part:', selectedPart.name, updateError);
-              }
-            }
-          } catch (error) {
-            console.error('Error processing inventory update for part:', selectedPart.name, error);
-          }
-        }
-      }
-
       // Save stop details to database
       const { data, error } = await supabase
         .from('route_stop_details')
@@ -825,11 +726,9 @@ function DriverDashboard() {
           stop_index: stopIndex,
           stop_id: stop.id?.toString() || stopIndex.toString(),
           work_description: details.workDescription || null,
-          amount_received: newAmount > 0 ? newAmount : null,
+          amount_received: details.amountReceived ? parseFloat(details.amountReceived) : null,
           parts_cost: details.partsCost ? parseFloat(details.partsCost) : null,
-          payment_to_driver: isPaymentToDriver,
-          completed_at: now,
-          selected_parts: details.selectedParts || null // Store selected parts as JSON
+          completed_at: now
         }, {
           onConflict: 'route_id,stop_index'
         })
@@ -837,50 +736,6 @@ function DriverDashboard() {
         .single();
 
       if (error) throw error;
-
-      // Update driver balance if payment_to_driver changed
-      if (driver && driver.id) {
-        let balanceChange = 0;
-        
-        // If payment was changed from zaak to monteur, add amount
-        if (!wasPaymentToDriver && isPaymentToDriver && newAmount > 0) {
-          balanceChange = newAmount;
-        }
-        // If payment was changed from monteur to zaak, subtract old amount
-        else if (wasPaymentToDriver && !isPaymentToDriver && oldAmount > 0) {
-          balanceChange = -oldAmount;
-        }
-        // If payment stayed monteur but amount changed
-        else if (wasPaymentToDriver && isPaymentToDriver && oldAmount !== newAmount) {
-          balanceChange = newAmount - oldAmount;
-        }
-
-        if (balanceChange !== 0) {
-          // Get current balance
-          const { data: currentDriver, error: driverError } = await supabase
-            .from('drivers')
-            .select('balance')
-            .eq('id', driver.id)
-            .single();
-
-          if (!driverError && currentDriver) {
-            const newBalance = (parseFloat(currentDriver.balance) || 0) + balanceChange;
-            
-            // Update driver balance
-            const { error: updateError } = await supabase
-              .from('drivers')
-              .update({ balance: newBalance })
-              .eq('id', driver.id);
-
-            if (updateError) {
-              console.error('Error updating driver balance:', updateError);
-            } else {
-              // Update local driver state
-              setDriver(prev => prev ? { ...prev, balance: newBalance } : null);
-            }
-          }
-        }
-      }
 
       // Save actual arrival time for this stop
       const { error: timestampError } = await supabase
@@ -905,33 +760,18 @@ function DriverDashboard() {
         [stopIndex]: details
       }));
 
-      // Update completed stops for this route
-      setCompletedStopsByRoute(prev => ({
-        ...prev,
-        [activeRoute.id]: new Set([...(prev[activeRoute.id] || []), stopIndex])
-      }));
-
       // Check if there are more stops
       if (stopIndex < activeRoute.stops.length - 1) {
-        // If continuing route, go to next stop (full page mode)
-        if (isContinuingRoute) {
+        // Close modal and reopen for next stop to reset form fields
+        setShowStopModal(false);
+        // Use setTimeout to ensure modal closes before reopening
+        setTimeout(() => {
           setCurrentStopIndex(stopIndex + 1);
-        } else {
-          // Close modal and reopen for next stop to reset form fields
-          setShowStopModal(false);
-          // Use setTimeout to ensure modal closes before reopening
-          setTimeout(() => {
-            setCurrentStopIndex(stopIndex + 1);
-            setShowStopModal(true);
-          }, 100);
-        }
+          setShowStopModal(true);
+        }, 100);
       } else {
         // All stops completed, show complete modal
-        if (isContinuingRoute) {
-          setIsContinuingRoute(false);
-        } else {
-          setShowStopModal(false);
-        }
+        setShowStopModal(false);
         setShowCompleteModal(true);
       }
     } catch (error) {
@@ -975,27 +815,58 @@ function DriverDashboard() {
 
       if (error) throw error;
 
-      // Update driver total hours
-      if (driver && driver.id) {
-        const { data: currentDriver, error: driverError } = await supabase
-          .from('drivers')
-          .select('total_hours')
-          .eq('id', driver.id)
-          .single();
+      // Save picked up bikes if any stops are selected
+      if (selectedPickedUpStops.length > 0 && activeRoute.stops) {
+        const pickedUpBikesData = selectedPickedUpStops.map(stopIndex => {
+          const stop = activeRoute.stops[stopIndex];
+          return {
+            user_id: currentUser.id,
+            route_id: activeRoute.id,
+            stop_index: stopIndex,
+            stop_name: stop.name || '',
+            stop_email: stop.email || '',
+            stop_phone: stop.phone || '',
+            stop_address: stop.address || '',
+            stop_coordinates: stop.coordinates || null,
+            driver_id: driver?.id || null,
+            driver_name: driver?.name || '',
+            route_name: activeRoute.name || '',
+            route_date: activeRoute.date || null
+          };
+        });
 
-        if (!driverError && currentDriver) {
-          const newTotalHours = (parseFloat(currentDriver.total_hours) || 0) + hours;
+        // Insert picked up bikes
+        const { error: bikesError } = await supabase
+          .from('picked_up_bikes')
+          .insert(pickedUpBikesData);
+
+        if (bikesError) {
+          console.error('Error saving picked up bikes:', bikesError);
+          // Don't fail the route completion if bike saving fails
+        } else {
+          // Send webhook for each picked up bike separately
+          const webhookUrl = 'https://hooks.zapier.com/hooks/catch/20451847/ulzf67x/';
           
-          const { error: updateError } = await supabase
-            .from('drivers')
-            .update({ total_hours: newTotalHours })
-            .eq('id', driver.id);
-
-          if (updateError) {
-            console.error('Error updating driver total hours:', updateError);
-          } else {
-            // Update local driver state
-            setDriver(prev => prev ? { ...prev, total_hours: newTotalHours } : null);
+          for (const bikeData of pickedUpBikesData) {
+            try {
+              await sendWebhook(webhookUrl, 'fiets-opgehaald', {
+                route_id: activeRoute.id,
+                route_name: activeRoute.name || '',
+                route_date: activeRoute.date || '',
+                stop_index: bikeData.stop_index,
+                stop_name: bikeData.stop_name,
+                stop_email: bikeData.stop_email,
+                stop_phone: bikeData.stop_phone,
+                stop_address: bikeData.stop_address,
+                stop_coordinates: bikeData.stop_coordinates,
+                driver_id: bikeData.driver_id,
+                driver_name: bikeData.driver_name,
+                picked_up_at: new Date().toISOString()
+              });
+            } catch (webhookError) {
+              console.error('Error sending webhook for picked up bike:', webhookError);
+              // Continue with other bikes even if one webhook fails
+            }
           }
         }
       }
@@ -1005,6 +876,16 @@ function DriverDashboard() {
         r.id === activeRoute.id ? { ...r, route_status: 'completed', hours_worked: hours, actual_distance_km: kilometers } : r
       ));
       
+      // Reload picked up bikes if any were saved
+      if (selectedPickedUpStops.length > 0 && driver?.id) {
+        try {
+          const bikesData = await getPickedUpBikesForDriver(driver.id);
+          setPickedUpBikes(bikesData || []);
+        } catch (bikesError) {
+          console.error('Error reloading picked up bikes:', bikesError);
+        }
+      }
+      
       // Reset state
       setActiveRoute(null);
       setCurrentStopIndex(0);
@@ -1012,6 +893,7 @@ function DriverDashboard() {
       setShowCompleteModal(false);
       setHoursWorked('');
       setKilometersDriven('');
+      setSelectedPickedUpStops([]);
       
       alert('Route succesvol voltooid!');
     } catch (error) {
@@ -1070,155 +952,6 @@ function DriverDashboard() {
   const plannedTodayRoutes = todayRoutes.filter(r => r.route_status === 'planned' || !r.route_status);
   const completedRoutes = routes.filter(r => r.route_status === 'completed');
 
-  // If continuing route, show full page stop details view
-  if (isContinuingRoute && activeRoute && activeRoute.stops && currentStopIndex < activeRoute.stops.length) {
-    return (
-      <div className="driver-dashboard">
-        <StopDetailsModal
-          stop={activeRoute.stops[currentStopIndex]}
-          stopIndex={currentStopIndex}
-          totalStops={activeRoute.stops.length}
-          routeId={activeRoute.id}
-          onSave={(details) => {
-            handleSaveStopDetails(currentStopIndex, details);
-            // After saving, check if there are more stops
-            if (currentStopIndex < activeRoute.stops.length - 1) {
-              setCurrentStopIndex(currentStopIndex + 1);
-            } else {
-              setIsContinuingRoute(false);
-              setShowCompleteModal(true);
-            }
-          }}
-          onClose={() => {
-            setIsContinuingRoute(false);
-            setActiveRoute(null);
-          }}
-          existingDetails={stopDetails[currentStopIndex]}
-          fullPage={true}
-        />
-      </div>
-    );
-  }
-
-  // If showing route overview, show full page route overview
-  if (showRouteOverview && activeRoute) {
-    return (
-      <div className="driver-dashboard">
-        <RouteOverviewModal
-          route={activeRoute}
-          timestamps={routeTimestamps}
-          onClose={() => {
-            setShowRouteOverview(false);
-            setActiveRoute(null);
-            setRouteTimestamps([]);
-          }}
-          fullPage={true}
-        />
-      </div>
-    );
-  }
-
-  // Get ISO week key (format: "2024-W01")
-  const getWeekKey = (date) => {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    const day = d.getDay() || 7;
-    d.setDate(d.getDate() + 4 - day);
-    const yearStart = new Date(d.getFullYear(), 0, 1);
-    const weekNumber = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-    const year = d.getFullYear();
-    return `${year}-W${String(weekNumber).padStart(2, '0')}`;
-  };
-
-  // Get weeks for display
-  const getWeeks = () => {
-    const weeks = [];
-    const today = new Date();
-    
-    for (let i = 0; i < 8; i++) {
-      const weekDate = new Date(today);
-      weekDate.setDate(today.getDate() + (i * 7));
-      const weekKey = getWeekKey(weekDate);
-      const weekNumber = weekKey.split('-W')[1];
-      const year = weekKey.split('-W')[0];
-      
-      weeks.push({
-        weekKey,
-        weekNumber,
-        year,
-        date: new Date(weekDate),
-        isCurrent: i === 0
-      });
-    }
-    
-    return weeks;
-  };
-
-  const weeks = getWeeks();
-  const currentWeek = weeks[currentWeekIndex] || weeks[0];
-  const currentWeekKey = currentWeek?.weekKey;
-
-  // Get availability for current week
-  const getWeekAvailability = (weekKey) => {
-    return availabilitySchedule[weekKey] || {};
-  };
-
-  // Update day availability for current week
-  const updateDayAvailability = (dayIndex, time) => {
-    if (!currentWeekKey) return;
-    
-    setAvailabilitySchedule(prev => {
-      const weekSchedule = prev[currentWeekKey] || {};
-      const newSchedule = { ...prev };
-      
-      if (time && time.trim() !== '') {
-        newSchedule[currentWeekKey] = {
-          ...weekSchedule,
-          [dayIndex.toString()]: time.trim()
-        };
-      } else {
-        // Remove day if time is empty
-        const { [dayIndex.toString()]: removed, ...rest } = weekSchedule;
-        if (Object.keys(rest).length === 0) {
-          // Remove week if no days left
-          const { [currentWeekKey]: removedWeek, ...restWeeks } = newSchedule;
-          return restWeeks;
-        }
-        newSchedule[currentWeekKey] = rest;
-      }
-      
-      return newSchedule;
-    });
-  };
-
-  // Handle saving availability schedule
-  const handleSaveAvailabilitySchedule = async () => {
-    if (!driver || !currentUser) return;
-
-    try {
-      setSavingAvailableDays(true);
-      const { error } = await supabase
-        .from('drivers')
-        .update({ availability_schedule: availabilitySchedule })
-        .eq('id', driver.id);
-
-      if (error) throw error;
-
-      // Update local driver state
-      setDriver(prev => ({ ...prev, availability_schedule: availabilitySchedule }));
-      setShowAvailableDaysModal(false);
-      alert('Beschikbaarheid opgeslagen!');
-    } catch (error) {
-      console.error('Error saving availability schedule:', error);
-      alert('Fout bij het opslaan van beschikbaarheid: ' + error.message);
-    } finally {
-      setSavingAvailableDays(false);
-    }
-  };
-
-  // Day names in Dutch
-  const dayNames = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag'];
-
   return (
     <div className="driver-dashboard">
       <div className="logo-header">
@@ -1228,24 +961,8 @@ function DriverDashboard() {
         <div className="driver-info">
           <h1>Welkom, {driver.name}</h1>
           <p>Chauffeur Dashboard</p>
-          <div className="driver-stats">
-            <div className="driver-stat-item">
-              <span className="stat-label">Balans:</span>
-              <span className="stat-value balance">€{(driver.balance || 0).toFixed(2)}</span>
-            </div>
-            <div className="driver-stat-item">
-              <span className="stat-label">Totaal uren:</span>
-              <span className="stat-value hours">{(driver.total_hours || 0).toFixed(1)}u</span>
-            </div>
-          </div>
         </div>
-        <div className="driver-header-buttons">
-          <button 
-            className="logout-btn availability-btn" 
-            onClick={() => setShowAvailableDaysModal(true)}
-          >
-            Beschikbare dagen
-          </button>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <button className="logout-btn" onClick={logout}>
             Uitloggen
           </button>
@@ -1268,10 +985,7 @@ function DriverDashboard() {
                   <div key={route.id} className="route-card active">
                     <div className="route-card-header">
                       <h3>{route.name || 'Route zonder naam'}</h3>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span className="route-status started">Gestart</span>
-                        <span className="live-indicator">LIVE</span>
-                      </div>
+                      <span className="route-status started">Gestart</span>
                     </div>
                     <div className="route-card-body">
                       <p><strong>Datum:</strong> {routeDate}</p>
@@ -1306,8 +1020,7 @@ function DriverDashboard() {
                           const firstIncomplete = findFirstIncompleteStop(route, details);
                           setCurrentStopIndex(firstIncomplete);
                           if (firstIncomplete < route.stops.length) {
-                            setIsContinuingRoute(true);
-                            setShowStopModal(false);
+                            setShowStopModal(true);
                           } else {
                             // All stops completed, show complete modal
                             setShowCompleteModal(true);
@@ -1317,30 +1030,6 @@ function DriverDashboard() {
                         Route voortzetten
                       </button>
                     </div>
-                    {/* Timeline van stops */}
-                    {route.stops && route.stops.length > 0 && (
-                      <div className="route-stops-timeline">
-                        <div className="timeline-stops">
-                          {route.stops.map((stop, index) => {
-                            const isCompleted = completedStopsByRoute[route.id]?.has(index) || false;
-                            return (
-                              <div key={index} className={`timeline-stop-item ${isCompleted ? 'completed' : ''}`}>
-                                <div className="timeline-stop-indicator">
-                                  {isCompleted ? (
-                                    <span className="timeline-stop-check">✓</span>
-                                  ) : (
-                                    <span className="timeline-stop-number">{index + 1}</span>
-                                  )}
-                                </div>
-                                {index < route.stops.length - 1 && (
-                                  <div className="timeline-stop-line"></div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -1448,6 +1137,42 @@ function DriverDashboard() {
           </div>
         )}
 
+        {/* Opgehaalde Fietsen */}
+        {pickedUpBikes.length > 0 && (
+          <div className="route-section">
+            <h2>Opgehaalde Fietsen</h2>
+            <div className="routes-list">
+              {pickedUpBikes.map((bike) => {
+                const daysSince = bike.picked_up_at 
+                  ? Math.floor((new Date() - new Date(bike.picked_up_at)) / (1000 * 60 * 60 * 24))
+                  : 0;
+                const pickupDate = bike.picked_up_at 
+                  ? new Date(bike.picked_up_at).toLocaleDateString('nl-NL')
+                  : '-';
+
+                return (
+                  <div key={bike.id} className="route-card">
+                    <div className="route-card-header">
+                      <h3>{bike.stop_name || 'Onbekende stop'}</h3>
+                      <div className="days-badge-small">
+                        <span className="days-number-small">{daysSince}</span>
+                        <span className="days-label-small">dag{daysSince !== 1 ? 'en' : ''}</span>
+                      </div>
+                    </div>
+                    <div className="route-card-body">
+                      <p><strong>Adres:</strong> {bike.stop_address || '-'}</p>
+                      <p><strong>Route:</strong> {bike.route_name || '-'}</p>
+                      <p><strong>Opgehaald op:</strong> {pickupDate}</p>
+                      {bike.stop_email && <p><strong>E-mail:</strong> {bike.stop_email}</p>}
+                      {bike.stop_phone && <p><strong>Telefoon:</strong> {bike.stop_phone}</p>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Geen routes */}
         {routes.length === 0 && (
           <div className="empty-routes">
@@ -1462,7 +1187,6 @@ function DriverDashboard() {
           stop={activeRoute.stops[currentStopIndex]}
           stopIndex={currentStopIndex}
           totalStops={activeRoute.stops.length}
-          routeId={activeRoute.id}
           onSave={(details) => handleSaveStopDetails(currentStopIndex, details)}
           onClose={() => {
             setShowStopModal(false);
@@ -1480,362 +1204,55 @@ function DriverDashboard() {
           onHoursChange={setHoursWorked}
           kilometersDriven={kilometersDriven}
           onKilometersChange={setKilometersDriven}
+          selectedPickedUpStops={selectedPickedUpStops}
+          onPickedUpStopsChange={setSelectedPickedUpStops}
           onComplete={handleCompleteRoute}
           onClose={() => {
             setShowCompleteModal(false);
             setActiveRoute(null);
             setHoursWorked('');
             setKilometersDriven('');
+            setSelectedPickedUpStops([]);
           }}
         />
       )}
 
-      {/* Available Days Modal */}
-      {showAvailableDaysModal && (
-        <div className="modal-overlay" onClick={() => setShowAvailableDaysModal(false)}>
-          <div className="modal-content available-days-modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>
-                {currentWeek?.isCurrent ? 'Huidige week' : 'Week'} {currentWeek?.weekNumber} - Beschikbaarheid
-              </h2>
-              <button className="close-button" onClick={() => {
-                setAvailabilitySchedule(driver.availability_schedule || {});
-                setCurrentWeekIndex(0);
-                setShowAvailableDaysModal(false);
-              }}>×</button>
-            </div>
-            <div className="modal-body">
-              {/* Week Navigation */}
-              <div className="week-navigation">
-                <button 
-                  className="week-nav-btn"
-                  onClick={() => setCurrentWeekIndex(Math.max(0, currentWeekIndex - 1))}
-                  disabled={currentWeekIndex === 0}
-                >
-                  ← Vorige
-                </button>
-                <div className="week-info">
-                  <span className="week-label">
-                    {currentWeek?.isCurrent ? 'Huidige week' : 'Week'} {currentWeek?.weekNumber} ({currentWeek?.year})
-                  </span>
-                </div>
-                <button 
-                  className="week-nav-btn"
-                  onClick={() => setCurrentWeekIndex(Math.min(weeks.length - 1, currentWeekIndex + 1))}
-                  disabled={currentWeekIndex === weeks.length - 1}
-                >
-                  Volgende →
-                </button>
-              </div>
-
-              <p style={{ marginBottom: '20px', color: '#666', marginTop: '20px' }}>
-                Geef per dag aan tot hoe laat je beschikbaar bent (bijv. 18:00):
-              </p>
-              <div className="available-days-grid">
-                {dayNames.map((dayName, index) => {
-                  const weekAvailability = getWeekAvailability(currentWeekKey);
-                  const time = weekAvailability[index.toString()] || '';
-                  
-                  return (
-                    <div key={index} className="day-time-input-group">
-                      <label className="day-checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={!!time}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              updateDayAvailability(index, '18:00');
-                            } else {
-                              updateDayAvailability(index, '');
-                            }
-                          }}
-                        />
-                        <span>{dayName}</span>
-                      </label>
-                      {time && (
-                        <input
-                          type="time"
-                          value={time}
-                          onChange={(e) => updateDayAvailability(index, e.target.value)}
-                          className="time-input"
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button 
-                className="btn-cancel" 
-                onClick={() => {
-                  // Reset to original driver data
-                  setAvailabilitySchedule(driver.availability_schedule || {});
-                  setCurrentWeekIndex(0);
-                  setShowAvailableDaysModal(false);
-                }}
-              >
-                Annuleren
-              </button>
-              <button 
-                className="btn-save" 
-                onClick={handleSaveAvailabilitySchedule}
-                disabled={savingAvailableDays}
-              >
-                {savingAvailableDays ? 'Opslaan...' : 'Opslaan'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Route Overview Modal */}
+      {showRouteOverview && activeRoute && (
+        <RouteOverviewModal
+          route={activeRoute}
+          timestamps={routeTimestamps}
+          onClose={() => {
+            setShowRouteOverview(false);
+            setActiveRoute(null);
+            setRouteTimestamps([]);
+          }}
+        />
       )}
-
     </div>
   );
 }
 
 // Stop Details Modal Component
-function StopDetailsModal({ stop, stopIndex, totalStops, routeId, onSave, onClose, existingDetails, fullPage = false }) {
-  const { currentUser } = useAuth();
+function StopDetailsModal({ stop, stopIndex, totalStops, onSave, onClose, existingDetails }) {
   const [workDescription, setWorkDescription] = useState(existingDetails?.workDescription || '');
   const [amountReceived, setAmountReceived] = useState(existingDetails?.amountReceived || '');
   const [partsCost, setPartsCost] = useState(existingDetails?.partsCost || '');
-  const [manualPartsCost, setManualPartsCost] = useState('');
-  const [useManualPartsCost, setUseManualPartsCost] = useState(false);
-  const [paymentToDriver, setPaymentToDriver] = useState(existingDetails?.paymentToDriver || false);
   const [showMapChooser, setShowMapChooser] = useState(false);
-  const [selectedParts, setSelectedParts] = useState(existingDetails?.selectedParts || []);
-  const [partsSearchQuery, setPartsSearchQuery] = useState('');
-  const [availableParts, setAvailableParts] = useState([]);
-  const [showPartsSearch, setShowPartsSearch] = useState(false);
-  const [routeOwnerId, setRouteOwnerId] = useState(null);
-
-  // Load route owner ID and available parts
-  useEffect(() => {
-    const loadRouteOwnerAndParts = async () => {
-      if (!routeId) return;
-      
-      try {
-        // Get route owner ID from route
-        const { data: routeData, error: routeError } = await supabase
-          .from('routes')
-          .select('user_id')
-          .eq('id', routeId)
-          .single();
-        
-        if (routeError) {
-          console.error('Error loading route:', routeError);
-          return;
-        }
-        
-        if (routeData?.user_id) {
-          setRouteOwnerId(routeData.user_id);
-          
-          // Load inventory for route owner
-          const { data: inventoryData, error: inventoryError } = await supabase
-            .from('inventory')
-            .select('id, name, quantity, purchase_price, price')
-            .eq('user_id', routeData.user_id)
-            .gt('quantity', 0)
-            .order('name', { ascending: true });
-          
-          if (!inventoryError && inventoryData) {
-            console.log('Loaded inventory items:', inventoryData.length);
-            if (inventoryData.length > 0) {
-              console.log('Sample item:', inventoryData[0]);
-              console.log('Sample purchase_price:', inventoryData[0]?.purchase_price, 'type:', typeof inventoryData[0]?.purchase_price);
-              // Check if purchase_price is null/undefined for all items
-              const itemsWithoutPrice = inventoryData.filter(item => !item.purchase_price || item.purchase_price === null);
-              if (itemsWithoutPrice.length > 0) {
-                console.warn(`Warning: ${itemsWithoutPrice.length} items have no purchase_price set`);
-              }
-            }
-            setAvailableParts(inventoryData);
-          } else if (inventoryError) {
-            console.error('Error loading inventory:', inventoryError);
-            console.error('Inventory error details:', JSON.stringify(inventoryError, null, 2));
-          }
-        }
-      } catch (error) {
-        console.error('Error loading route owner or parts:', error);
-      }
-    };
-    
-    loadRouteOwnerAndParts();
-  }, [routeId]);
 
   // Reset form fields when stopIndex changes (new stop)
   useEffect(() => {
     setWorkDescription(existingDetails?.workDescription || '');
     setAmountReceived(existingDetails?.amountReceived || '');
-    setPaymentToDriver(existingDetails?.paymentToDriver || false);
-    const parts = existingDetails?.selectedParts || [];
-    
-    // Update purchase_price from availableParts if available
-    // Use price as purchase_price (inkoopprijs)
-    const updatedParts = parts.map(part => {
-      const availablePart = availableParts.find(ap => ap.id === part.id);
-      const purchasePrice = availablePart?.price || availablePart?.purchase_price || part.purchase_price || 0;
-      return {
-        ...part,
-        purchase_price: purchasePrice
-      };
-    });
-    
-    setSelectedParts(updatedParts);
-    // Recalculate parts cost
-    const totalCost = updatedParts.reduce((sum, part) => {
-      const price = part.purchase_price != null ? parseFloat(part.purchase_price) : 0;
-      const qty = part.quantity || 0;
-      return sum + (price * qty);
-    }, 0);
-    console.log('Recalculated total cost from existing parts:', totalCost);
-    const existingPartsCost = existingDetails?.partsCost || '';
-    setPartsCost(totalCost > 0 ? totalCost.toFixed(2) : '');
-    // Check if existing parts cost differs from calculated (manual override was used)
-    if (existingPartsCost && Math.abs(parseFloat(existingPartsCost) - totalCost) > 0.01) {
-      setManualPartsCost(existingPartsCost);
-      setUseManualPartsCost(true);
-    } else {
-      setManualPartsCost('');
-      setUseManualPartsCost(false);
-    }
-  }, [stopIndex, existingDetails, availableParts]);
-
-  // Update parts cost when selected parts change (only if not using manual cost)
-  useEffect(() => {
-    if (useManualPartsCost) {
-      // Don't auto-update if user is using manual cost
-      return;
-    }
-    const totalCost = selectedParts.reduce((sum, part) => {
-      const price = part.purchase_price != null ? parseFloat(part.purchase_price) : 0;
-      const qty = part.quantity || 0;
-      const partTotal = price * qty;
-      return sum + partTotal;
-    }, 0);
-    console.log('Selected parts changed, new total:', totalCost, 'selectedParts:', selectedParts);
-    setPartsCost(totalCost > 0 ? totalCost.toFixed(2) : '');
-  }, [selectedParts, useManualPartsCost]);
-
-  // Filter parts based on search query
-  const filteredParts = availableParts.filter(part =>
-    part.name?.toLowerCase().includes(partsSearchQuery.toLowerCase())
-  );
-
-  // Add part to selected parts
-  const handleAddPart = (part) => {
-    console.log('Adding part:', part);
-    
-    const existingIndex = selectedParts.findIndex(p => p.id === part.id);
-    const currentSelectedQty = existingIndex >= 0 ? (selectedParts[existingIndex].quantity || 0) : 0;
-    const newQty = currentSelectedQty + 1;
-    
-    // Check if there's enough stock
-    const availableQty = part.quantity || 0;
-    if (newQty > availableQty) {
-      alert(`Niet genoeg voorraad. Beschikbaar: ${availableQty} stuks`);
-      return;
-    }
-    
-    // Use price as purchase_price (inkoopprijs)
-    // Fallback: use purchase_price if price is not available, otherwise 0
-    let purchasePrice = 0;
-    if (part.price != null && part.price !== '' && !isNaN(part.price)) {
-      purchasePrice = parseFloat(part.price);
-    } else if (part.purchase_price != null && part.purchase_price !== '' && !isNaN(part.purchase_price)) {
-      purchasePrice = parseFloat(part.purchase_price);
-    }
-    
-    console.log('Using price as purchase_price:', purchasePrice);
-    
-    if (existingIndex >= 0) {
-      // Update quantity and ensure purchase_price is up to date
-      const updated = [...selectedParts];
-      updated[existingIndex] = {
-        ...updated[existingIndex],
-        quantity: newQty,
-        purchase_price: purchasePrice || updated[existingIndex].purchase_price || 0
-      };
-      console.log('Updated part:', updated[existingIndex]);
-      setSelectedParts(updated);
-    } else {
-      // Add new part
-      const newPart = {
-        id: part.id,
-        name: part.name,
-        quantity: 1,
-        purchase_price: purchasePrice,
-        available_quantity: part.quantity // Store available quantity for validation
-      };
-      console.log('New part added:', newPart);
-      setSelectedParts([...selectedParts, newPart]);
-    }
-    setPartsSearchQuery('');
-    setShowPartsSearch(false);
-  };
-
-  // Update part quantity
-  const handleUpdatePartQuantity = (partId, delta) => {
-    const updated = selectedParts.map(part => {
-      if (part.id === partId) {
-        const newQuantity = Math.max(0, (part.quantity || 1) + delta);
-        
-        // Check stock availability and get latest purchase_price
-        const availablePart = availableParts.find(p => p.id === partId);
-        const availableQty = availablePart?.quantity || part.available_quantity || 0;
-        
-        if (newQuantity > availableQty) {
-          alert(`Niet genoeg voorraad. Beschikbaar: ${availableQty} stuks`);
-          return part; // Don't update
-        }
-        
-        if (newQuantity === 0) {
-          return null; // Mark for removal
-        }
-        // Update quantity and ensure purchase_price is up to date from availableParts
-        // Use price as purchase_price (inkoopprijs)
-        const purchasePrice = availablePart?.price || availablePart?.purchase_price || part.purchase_price || 0;
-        return { 
-          ...part, 
-          quantity: newQuantity,
-          purchase_price: purchasePrice
-        };
-      }
-      return part;
-    }).filter(Boolean);
-    setSelectedParts(updated);
-  };
-
-  // Remove part
-  const handleRemovePart = (partId) => {
-    setSelectedParts(selectedParts.filter(p => p.id !== partId));
-  };
-
-  // Calculate total parts cost
-  const calculateTotalPartsCost = () => {
-    const total = selectedParts.reduce((sum, part) => {
-      const price = parseFloat(part.purchase_price || 0);
-      const qty = part.quantity || 0;
-      const partTotal = price * qty;
-      console.log(`Part: ${part.name}, price: ${price}, qty: ${qty}, total: ${partTotal}`);
-      return sum + partTotal;
-    }, 0);
-    console.log('Total parts cost:', total);
-    return total;
-  };
+    setPartsCost(existingDetails?.partsCost || '');
+  }, [stopIndex, existingDetails]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Use manual parts cost if enabled, otherwise use calculated cost
-    const finalPartsCost = useManualPartsCost && manualPartsCost && manualPartsCost.trim() !== ''
-      ? parseFloat(manualPartsCost)
-      : (partsCost && partsCost.trim() !== '' ? parseFloat(partsCost) : calculateTotalPartsCost());
     onSave({
       workDescription,
       amountReceived,
-      partsCost: finalPartsCost > 0 ? finalPartsCost.toFixed(2) : '',
-      paymentToDriver,
-      selectedParts
+      partsCost
     });
   };
 
@@ -1856,24 +1273,9 @@ function StopDetailsModal({ stop, stopIndex, totalStops, routeId, onSave, onClos
     setShowMapChooser(false);
   };
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showPartsSearch && !event.target.closest('.parts-selection-container')) {
-        setShowPartsSearch(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showPartsSearch]);
-
   return (
-    <div className={fullPage ? "stop-details-full-page" : "modal-overlay"} onClick={(e) => {
-      if (!fullPage && e.target === e.currentTarget) {
-        setShowPartsSearch(false);
-      }
-    }}>
-      <div className={fullPage ? "stop-details-full-page-content" : "modal-content stop-details-modal"}>
+    <div className="modal-overlay">
+      <div className="modal-content stop-details-modal">
         <div className="modal-header">
           <h2>
             <span className="current-stop-number">{stopIndex + 1}</span>
@@ -1898,6 +1300,7 @@ function StopDetailsModal({ stop, stopIndex, totalStops, routeId, onSave, onClos
                 <a href={`tel:${stop.phone.replace(/\s/g, '')}`} className="phone-link-button">
                   <span className="phone-icon">📞</span>
                   <span className="phone-text">{stop.phone}</span>
+                  <span className="phone-label">Bel nu</span>
                 </a>
               </div>
             )}
@@ -1928,167 +1331,16 @@ function StopDetailsModal({ stop, stopIndex, totalStops, routeId, onSave, onClos
             </div>
             <div className="form-group">
               <label htmlFor="parts-cost">Kosten onderdelen (€)</label>
-              <div className="parts-selection-container">
-                <div className="parts-selection-header">
-                  <input
-                    type="text"
-                    className="parts-search-input"
-                    placeholder="Zoek onderdeel..."
-                    value={partsSearchQuery}
-                    onChange={(e) => {
-                      setPartsSearchQuery(e.target.value);
-                      setShowPartsSearch(true);
-                    }}
-                    onFocus={() => setShowPartsSearch(true)}
-                  />
-                  {showPartsSearch && filteredParts.length > 0 && (
-                    <div className="parts-search-dropdown">
-                      {filteredParts.map(part => (
-                        <div
-                          key={part.id}
-                          className="parts-search-item"
-                          onClick={() => handleAddPart(part)}
-                        >
-                          <div className="parts-search-item-name">{part.name}</div>
-                          <div className="parts-search-item-info">
-                            <span>Voorraad: {part.quantity}</span>
-                            {(part.price != null && part.price !== '') || (part.purchase_price != null && part.purchase_price !== '') ? (
-                              <span>Inkoop: €{parseFloat(part.price || part.purchase_price || 0).toFixed(2)}</span>
-                            ) : (
-                              <span style={{ color: '#ff6b6b' }}>Geen prijs</span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                
-                {selectedParts.length > 0 && (
-                  <div className="selected-parts-list">
-                    {selectedParts.map(part => {
-                      const purchasePrice = part.purchase_price != null ? parseFloat(part.purchase_price) : 0;
-                      const qty = part.quantity || 0;
-                      const partTotal = purchasePrice * qty;
-                      return (
-                        <div key={part.id} className="selected-part-item">
-                          <div className="selected-part-info">
-                            <span className="selected-part-name">{part.name}</span>
-                            <span className="selected-part-price">
-                              €{purchasePrice.toFixed(2)} × {qty} = €{partTotal.toFixed(2)}
-                            </span>
-                          </div>
-                          <div className="selected-part-actions">
-                            <button
-                              type="button"
-                              className="part-qty-btn minus"
-                              onClick={() => handleUpdatePartQuantity(part.id, -1)}
-                            >
-                              −
-                            </button>
-                            <span className="part-qty-value">{part.quantity}</span>
-                            <button
-                              type="button"
-                              className="part-qty-btn plus"
-                              onClick={() => handleUpdatePartQuantity(part.id, 1)}
-                            >
-                              +
-                            </button>
-                            <button
-                              type="button"
-                              className="part-remove-btn"
-                              onClick={() => handleRemovePart(part.id)}
-                            >
-                              ×
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    <div className="parts-total-cost">
-                      <strong>Automatisch berekend totaal: €{calculateTotalPartsCost().toFixed(2)}</strong>
-                    </div>
-                  </div>
-                )}
-                
-                <div style={{ marginTop: '12px' }}>
-                  <label htmlFor="calculated-parts-cost" style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
-                    Automatisch berekend bedrag (€)
-                  </label>
-                  <input
-                    type="number"
-                    id="calculated-parts-cost"
-                    step="0.01"
-                    min="0"
-                    value={partsCost}
-                    placeholder="0.00"
-                    readOnly
-                    style={{ 
-                      width: '100%',
-                      padding: '8px',
-                      border: '1px solid #ddd',
-                      borderRadius: '4px',
-                      backgroundColor: '#f5f5f5',
-                      cursor: 'not-allowed'
-                    }}
-                  />
-                </div>
-                
-                <div style={{ marginTop: '12px' }}>
-                  <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <input
-                      type="checkbox"
-                      checked={useManualPartsCost}
-                      onChange={(e) => {
-                        setUseManualPartsCost(e.target.checked);
-                        if (!e.target.checked) {
-                          setManualPartsCost('');
-                        }
-                      }}
-                    />
-                    <span>Handmatig bedrag invoeren</span>
-                  </label>
-                  {useManualPartsCost && (
-                    <input
-                      type="number"
-                      id="manual-parts-cost"
-                      step="0.01"
-                      min="0"
-                      value={manualPartsCost}
-                      onChange={(e) => setManualPartsCost(e.target.value)}
-                      placeholder="0.00"
-                      style={{ 
-                        width: '100%',
-                        marginTop: '8px',
-                        padding: '8px',
-                        border: '1px solid #ddd',
-                        borderRadius: '4px'
-                      }}
-                    />
-                  )}
-                </div>
-                <small className="form-hint">
-                  Selecteer onderdelen hierboven voor automatische berekening. Vink "Handmatig bedrag invoeren" aan om een eigen bedrag in te voeren.
-                </small>
-              </div>
+              <input
+                type="number"
+                id="parts-cost"
+                step="0.01"
+                min="0"
+                value={partsCost}
+                onChange={(e) => setPartsCost(e.target.value)}
+                placeholder="0.00"
+              />
             </div>
-            {amountReceived && parseFloat(amountReceived) > 0 && (
-              <div className="form-group">
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={paymentToDriver}
-                    onChange={(e) => setPaymentToDriver(e.target.checked)}
-                  />
-                  <span>Geld naar monteur (€{parseFloat(amountReceived).toFixed(2)})</span>
-                </label>
-                <small className="form-hint">
-                  {paymentToDriver 
-                    ? 'Dit bedrag wordt toegevoegd aan je balans' 
-                    : 'Dit bedrag gaat naar de zaak'}
-                </small>
-              </div>
-            )}
             <div className="modal-actions">
               <button type="button" className="btn-cancel" onClick={onClose}>
                 Annuleren
@@ -2130,7 +1382,7 @@ function StopDetailsModal({ stop, stopIndex, totalStops, routeId, onSave, onClos
 }
 
 // Complete Route Modal Component
-function CompleteRouteModal({ route, hoursWorked, onHoursChange, kilometersDriven, onKilometersChange, onComplete, onClose }) {
+function CompleteRouteModal({ route, hoursWorked, onHoursChange, kilometersDriven, onKilometersChange, selectedPickedUpStops, onPickedUpStopsChange, onComplete, onClose }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!hoursWorked || parseFloat(hoursWorked) <= 0) {
@@ -2144,8 +1396,17 @@ function CompleteRouteModal({ route, hoursWorked, onHoursChange, kilometersDrive
     onComplete();
   };
 
+  const handleStopToggle = (stopIndex) => {
+    if (selectedPickedUpStops.includes(stopIndex)) {
+      onPickedUpStopsChange(selectedPickedUpStops.filter(idx => idx !== stopIndex));
+    } else {
+      onPickedUpStopsChange([...selectedPickedUpStops, stopIndex]);
+    }
+  };
+
   // Get planned distance from route_data if available
   const plannedDistanceKm = route?.route_data?.distance ? (route.route_data.distance / 1000).toFixed(2) : null;
+  const stops = route?.stops || [];
 
   return (
     <div className="modal-overlay">
@@ -2188,6 +1449,25 @@ function CompleteRouteModal({ route, hoursWorked, onHoursChange, kilometersDrive
                 required
               />
             </div>
+            <div className="form-group">
+              <label>Opgehaalde fietsen (optioneel)</label>
+              <p className="form-hint">Selecteer de stops waar je een fiets hebt opgehaald:</p>
+              <div className="picked-up-stops-list">
+                {stops.map((stop, index) => (
+                  <label key={index} className="stop-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={selectedPickedUpStops.includes(index)}
+                      onChange={() => handleStopToggle(index)}
+                    />
+                    <span className="stop-checkbox-text">
+                      {stop.name || stop.address || `Stop ${index + 1}`}
+                      {stop.address && <span className="stop-address"> - {stop.address}</span>}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
             <div className="modal-actions">
               <button type="button" className="btn-cancel" onClick={onClose}>
                 Annuleren
@@ -2204,7 +1484,7 @@ function CompleteRouteModal({ route, hoursWorked, onHoursChange, kilometersDrive
 }
 
 // Route Overview Modal Component
-function RouteOverviewModal({ route, timestamps, onClose, fullPage = false }) {
+function RouteOverviewModal({ route, timestamps, onClose }) {
   const [showMapChooser, setShowMapChooser] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [selectedCoordinates, setSelectedCoordinates] = useState(null);
@@ -2335,8 +1615,8 @@ function RouteOverviewModal({ route, timestamps, onClose, fullPage = false }) {
   const routeEndTime = endTime ? formatTime(endTime.toISOString()) : '--:--';
 
   return (
-    <div className={fullPage ? "route-overview-full-page" : "modal-overlay"}>
-      <div className={fullPage ? "route-overview-full-page-content" : "modal-content route-overview-modal"} style={fullPage ? {} : { maxWidth: '800px', maxHeight: '90vh', overflow: 'auto' }}>
+    <div className="modal-overlay">
+      <div className="modal-content route-overview-modal" style={{ maxWidth: '800px', maxHeight: '90vh', overflow: 'auto' }}>
         <div className="modal-header">
           <h2>Route Overzicht: {route.name || 'Route zonder naam'}</h2>
           <button className="close-button" onClick={onClose}>×</button>
@@ -2388,10 +1668,6 @@ function RouteOverviewModal({ route, timestamps, onClose, fullPage = false }) {
                 </div>
               );
             })()}
-            <div className="info-row">
-              <span className="info-label">Service tijd per stop:</span>
-              <span className="info-value">{route.route_data?.service_time || 5} minuten</span>
-            </div>
           </div>
 
           <div className="stops-overview">
@@ -2424,6 +1700,7 @@ function RouteOverviewModal({ route, timestamps, onClose, fullPage = false }) {
                               <a href={`tel:${stop.phone.replace(/\s/g, '')}`} className="phone-link-button">
                                 <span className="phone-icon">📞</span>
                                 <span className="phone-text">{stop.phone}</span>
+                                <span className="phone-label">Bel nu</span>
                               </a>
                             </div>
                           )}

@@ -8,7 +8,7 @@ const { google } = require('googleapis');
 const app = express();
 const PORT = process.env.PORT || 8001;
 const RESEND_API_KEY = process.env.RESEND_API_KEY || 're_iDLLL1LU_NKoUQ1R5oReCnu4AJawE8Sy3';
-const MAPBOX_SECRET_TOKEN = process.env.MAPBOX_SECRET_TOKEN || '';
+const MAPBOX_SECRET_TOKEN = process.env.MAPBOX_SECRET_TOKEN || 'sk.eyJ1IjoiZmF0YmlrZWh1bHAiLCJhIjoiY21qNnhqdXdjMDExcDNkczZrNmN6ZGtkcCJ9._qbrsDUZpEOR97cAI17-hA';
 
 // Google Ads Configuration
 const GOOGLE_ADS_CLIENT_ID = process.env.GOOGLE_ADS_CLIENT_ID;
@@ -166,6 +166,23 @@ app.post('/api/send-webhook', async (req, res) => {
         start_address: data.start_address || data.startAddress || '',
         start_coordinates: data.start_coordinates || data.startCoordinates || null,
         registration_date: data.registration_date || data.registrationDate || new Date().toISOString()
+      };
+    } else if (templateType === 'fiets-opgehaald') {
+      payload = {
+        ...payload,
+        event: 'bike_picked_up',
+        route_id: data.route_id || '',
+        route_name: data.route_name || '',
+        route_date: data.route_date || '',
+        stop_index: data.stop_index !== undefined ? data.stop_index : null,
+        stop_name: data.stop_name || '',
+        stop_email: data.stop_email || '',
+        stop_phone: data.stop_phone || '',
+        stop_address: data.stop_address || '',
+        stop_coordinates: data.stop_coordinates || null,
+        driver_id: data.driver_id || '',
+        driver_name: data.driver_name || '',
+        picked_up_at: data.picked_up_at || new Date().toISOString()
       };
     }
 
