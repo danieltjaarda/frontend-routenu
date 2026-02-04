@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { getEmailTemplate, sendWebhook, getRouteStopTimestamps, recalculateArrivalTimes, getPickedUpBikesForDriver } from '../services/userData';
@@ -11,6 +12,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 
 const FRONTEND_BASE_URL = process.env.REACT_APP_FRONTEND_URL || (process.env.NODE_ENV === 'production' ? 'https://app.routenu.nl' : window.location.origin);
 
 function DriverDashboard() {
+  const navigate = useNavigate();
   const { currentUser, logout } = useAuth();
   const [driver, setDriver] = useState(null);
   const [routes, setRoutes] = useState([]);
@@ -27,6 +29,34 @@ function DriverDashboard() {
   const [kilometersDriven, setKilometersDriven] = useState('');
   const [selectedPickedUpStops, setSelectedPickedUpStops] = useState([]);
   const [pickedUpBikes, setPickedUpBikes] = useState([]);
+  const [routeStopDetails, setRouteStopDetails] = useState({}); // Store stop details per route
+
+  // Load stop details for a route
+  const loadStopDetails = async (routeId) => {
+    try {
+      const { data, error } = await supabase
+        .from('route_stop_details')
+        .select('*')
+        .eq('route_id', routeId)
+        .order('stop_index', { ascending: true });
+
+      if (error) throw error;
+
+      const detailsMap = {};
+      data.forEach(detail => {
+        detailsMap[detail.stop_index] = {
+          workDescription: detail.work_description || '',
+          amountReceived: detail.amount_received?.toString() || '',
+          partsCost: detail.parts_cost?.toString() || ''
+        };
+      });
+
+      return detailsMap;
+    } catch (error) {
+      console.error('Error loading stop details:', error);
+      return {};
+    }
+  };
 
   useEffect(() => {
     const loadDriverData = async () => {
@@ -77,6 +107,16 @@ function DriverDashboard() {
           } else {
             console.log('Loaded routes for driver:', routesData);
             setRoutes(routesData || []);
+            
+            // Load stop details for all started routes
+            if (routesData && routesData.length > 0) {
+              routesData.forEach(async (route) => {
+                if (route.route_status === 'started' && route.stops && route.stops.length > 0) {
+                  const details = await loadStopDetails(route.id);
+                  setRouteStopDetails(prev => ({ ...prev, [route.id]: details }));
+                }
+              });
+            }
           }
 
           // Load picked up bikes for this driver
@@ -97,34 +137,6 @@ function DriverDashboard() {
     loadDriverData();
   }, [currentUser, logout]);
 
-  // Load stop details for a route
-  const loadStopDetails = async (routeId) => {
-    try {
-      const { data, error } = await supabase
-        .from('route_stop_details')
-        .select('*')
-        .eq('route_id', routeId)
-        .order('stop_index', { ascending: true });
-
-      if (error) throw error;
-
-      const detailsMap = {};
-      data.forEach(detail => {
-        detailsMap[detail.stop_index] = {
-          workDescription: detail.work_description || '',
-          amountReceived: detail.amount_received?.toString() || '',
-          partsCost: detail.parts_cost?.toString() || ''
-        };
-      });
-
-      setStopDetails(detailsMap);
-      return detailsMap;
-    } catch (error) {
-      console.error('Error loading stop details:', error);
-      return {};
-    }
-  };
-
   // Find first incomplete stop (needs to be called after stopDetails are loaded)
   const findFirstIncompleteStop = (route, loadedDetails) => {
     if (!route.stops || route.stops.length === 0) return 0;
@@ -135,6 +147,11 @@ function DriverDashboard() {
       }
     }
     return route.stops.length; // All stops completed
+  };
+
+  // Check if a stop is completed
+  const isStopCompleted = (routeId, stopIndex) => {
+    return !!stopDetails[stopIndex];
   };
 
 
@@ -980,6 +997,7 @@ function DriverDashboard() {
                   ? new Date(route.date).toLocaleDateString('nl-NL')
                   : '-';
                 const stopsCount = route.stops?.length || 0;
+                const routeDetails = routeStopDetails[route.id] || {};
 
                 return (
                   <div key={route.id} className="route-card active">
@@ -1012,24 +1030,38 @@ function DriverDashboard() {
                       </button>
                       <button 
                         className="btn-continue"
-                        onClick={async () => {
-                          setActiveRoute(route);
-                          // Load existing stop details
-                          const details = await loadStopDetails(route.id);
-                          // Find first incomplete stop
-                          const firstIncomplete = findFirstIncompleteStop(route, details);
-                          setCurrentStopIndex(firstIncomplete);
-                          if (firstIncomplete < route.stops.length) {
-                            setShowStopModal(true);
-                          } else {
-                            // All stops completed, show complete modal
-                            setShowCompleteModal(true);
-                          }
+                        onClick={() => {
+                          navigate(`/monteur/route/${route.id}`);
                         }}
                       >
                         Route voortzetten
                       </button>
                     </div>
+                    {/* Timeline */}
+                    {route.stops && route.stops.length > 0 && (
+                      <div className="route-timeline-small">
+                        {route.stops.map((stop, index) => {
+                          const isCompleted = !!routeDetails[index];
+                          return (
+                            <div 
+                              key={index} 
+                              className={`timeline-item-small ${isCompleted ? 'completed' : ''}`}
+                            >
+                              <div className="timeline-marker-small">
+                                {isCompleted ? (
+                                  <span className="checkmark-small">✓</span>
+                                ) : (
+                                  <span className="stop-number-small">{index + 1}</span>
+                                )}
+                              </div>
+                              <div className="timeline-content-small">
+                                <span className="stop-name-small">{stop.name || `Stop ${index + 1}`}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })}

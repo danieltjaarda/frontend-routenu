@@ -83,8 +83,20 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    try {
+      // Check if there's an active session before signing out
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+      }
+      // If no session, just clear the local state
+      setCurrentUser(null);
+    } catch (error) {
+      // If signOut fails, still clear local state
+      console.warn('Logout error (non-critical):', error);
+      setCurrentUser(null);
+    }
   };
 
   useEffect(() => {

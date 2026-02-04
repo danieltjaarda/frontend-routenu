@@ -1687,6 +1687,256 @@
   }
 }
 
+/* Small Timeline for Route Cards */
+.route-timeline-small {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e5e7;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.timeline-item-small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.timeline-marker-small {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f5f7;
+  border: 1px solid #e5e5e7;
+  flex-shrink: 0;
+}
+
+.timeline-item-small.completed .timeline-marker-small {
+  background: #1d1d1f;
+  border-color: #1d1d1f;
+}
+
+.stop-number-small {
+  font-size: 11px;
+  font-weight: 600;
+  color: #86868b;
+}
+
+.timeline-item-small.completed .stop-number-small {
+  color: #ffffff;
+}
+
+.checkmark-small {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.timeline-content-small {
+  flex: 1;
+  min-width: 0;
+}
+
+.stop-name-small {
+  font-size: 13px;
+  color: #1d1d1f;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+  display: block;
+}
+
+.timeline-item-small.completed .stop-name-small {
+  color: #86868b;
+}
+
+/* Full Timeline for Continue Route Page */
+.route-timeline-container {
+  margin: 24px;
+  padding: 20px;
+  background: #f5f5f7;
+  border-radius: 12px;
+}
+
+.route-timeline-container h2 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.route-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.timeline-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: #ffffff;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.timeline-item:hover {
+  background: #f5f5f7;
+}
+
+.timeline-item.current {
+  background: #e8f4f8;
+  border: 2px solid #007aff;
+}
+
+.timeline-marker {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f5f7;
+  border: 2px solid #e5e5e7;
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.timeline-item.completed .timeline-marker {
+  background: #34c759;
+  border-color: #34c759;
+}
+
+.timeline-item.current .timeline-marker {
+  background: #007aff;
+  border-color: #007aff;
+}
+
+.timeline-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.timeline-content h3 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.stop-address {
+  font-size: 14px;
+  color: #86868b;
+  margin: 4px 0;
+}
+
+.completed-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  background: #34c759;
+  color: #ffffff;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* Continue Route Form */
+.continue-route-form {
+  margin: 24px;
+  padding: 20px;
+  background: #ffffff;
+  border-radius: 12px;
+}
+
+.continue-route-form h2 {
+  margin: 0 0 20px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.stop-info-card {
+  padding: 16px;
+  background: #f5f5f7;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.stop-info-card h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.form-actions .btn-cancel {
+  flex: 1;
+  padding: 12px 20px;
+  border: 1px solid #e5e5e7;
+  border-radius: 9999px;
+  background: #ffffff;
+  color: #1d1d1f;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.form-actions .btn-cancel:hover {
+  background: #f5f5f7;
+}
+
+.form-actions .btn-submit {
+  flex: 1;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 9999px;
+  background: #007aff;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.form-actions .btn-submit:hover {
+  background: #0051d5;
+}
+
+.all-completed-message {
+  margin: 24px;
+  padding: 40px 20px;
+  text-align: center;
+  background: #f5f5f7;
+  border-radius: 12px;
+}
+
+.all-completed-message h2 {
+  margin: 0 0 20px 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #34c759;
+}
+
 /* Safe Area for Notched Devices */
 @supports (padding: max(0px)) {
   .driver-dashboard {

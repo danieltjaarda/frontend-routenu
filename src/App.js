@@ -19,9 +19,11 @@ import Register from './pages/Register';
 import Profile from './pages/Profile';
 import DriverLogin from './pages/DriverLogin';
 import DriverDashboard from './pages/DriverDashboard';
+import ContinueRoute from './pages/ContinueRoute';
 import Drivers from './pages/Drivers';
 import Checkout from './pages/Checkout';
 import PickedUpBikes from './pages/PickedUpBikes';
+import Inventory from './pages/Inventory';
 import { 
   getUserVehicles, 
   getUserOrders, 
@@ -1031,6 +1033,14 @@ function AppContent() {
             } 
           />
           <Route 
+            path="/voorraad" 
+            element={
+              <ProtectedRoute>
+                {loading ? <div>Laden...</div> : <Inventory />}
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/route-aanmaken" 
             element={
               <ProtectedRoute>
@@ -1122,6 +1132,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <DriverDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/monteur/route/:routeId" 
+            element={
+              <ProtectedRoute>
+                <ContinueRoute />
               </ProtectedRoute>
             } 
           />
