@@ -20,6 +20,10 @@ function Inventory() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [sortBy, setSortBy] = useState('price');
   const [sortDirection, setSortDirection] = useState('desc');
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState('alle');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -61,6 +65,50 @@ function Inventory() {
 
     loadParts();
   }, [currentUser]);
+
+  // Log inventory history entry
+  const logInventoryHistory = async (action, itemName, details = {}) => {
+    if (!currentUser) return;
+    try {
+      await supabase
+        .from('inventory_history')
+        .insert([{
+          user_id: currentUser.id,
+          inventory_item_id: details.itemId || null,
+          item_name: itemName,
+          action: action,
+          changes: details.changes || {},
+          old_values: details.oldValues || {},
+          new_values: details.newValues || {},
+          quantity_before: details.quantityBefore ?? null,
+          quantity_after: details.quantityAfter ?? null
+        }]);
+    } catch (error) {
+      console.error('Error logging inventory history:', error);
+    }
+  };
+
+  // Load inventory history
+  const loadHistory = async () => {
+    if (!currentUser) return;
+    setHistoryLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('inventory_history')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      setHistory(data || []);
+    } catch (error) {
+      console.error('Error loading inventory history:', error);
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   // Get unique categories for filter
   const categories = useMemo(() => {
@@ -327,7 +375,21 @@ function Inventory() {
       };
 
       if (editingPart) {
-        // Update existing
+        // Update existing - detect what changed
+        const changes = {};
+        const oldValues = {};
+        const newValues = {};
+        const fields = ['name', 'article_number', 'quantity', 'min_quantity', 'price', 'purchase_price', 'category', 'location', 'supplier', 'notes'];
+        fields.forEach(field => {
+          const oldVal = editingPart[field];
+          const newVal = partData[field];
+          if (String(oldVal ?? '') !== String(newVal ?? '')) {
+            changes[field] = { van: oldVal ?? '-', naar: newVal ?? '-' };
+            oldValues[field] = oldVal;
+            newValues[field] = newVal;
+          }
+        });
+
         const { error } = await supabase
           .from('inventory')
           .update(partData)
@@ -338,6 +400,18 @@ function Inventory() {
         setParts(prev => prev.map(p => 
           p.id === editingPart.id ? { ...p, ...partData } : p
         ));
+
+        // Log history
+        if (Object.keys(changes).length > 0) {
+          await logInventoryHistory('bewerkt', partData.name, {
+            itemId: editingPart.id,
+            changes,
+            oldValues,
+            newValues,
+            quantityBefore: editingPart.quantity,
+            quantityAfter: partData.quantity
+          });
+        }
       } else {
         // Create new
         const { data, error } = await supabase
@@ -348,6 +422,13 @@ function Inventory() {
 
         if (error) throw error;
         setParts(prev => [...prev, data]);
+
+        // Log history
+        await logInventoryHistory('toegevoegd', partData.name, {
+          itemId: data.id,
+          newValues: partData,
+          quantityAfter: partData.quantity
+        });
       }
 
       handleCloseModal();
@@ -364,6 +445,8 @@ function Inventory() {
       return;
     }
 
+    const partToDelete = parts.find(p => p.id === partId);
+
     try {
       const { error } = await supabase
         .from('inventory')
@@ -372,6 +455,20 @@ function Inventory() {
 
       if (error) throw error;
       setParts(prev => prev.filter(p => p.id !== partId));
+
+      // Log history
+      if (partToDelete) {
+        await logInventoryHistory('verwijderd', partToDelete.name, {
+          oldValues: {
+            name: partToDelete.name,
+            quantity: partToDelete.quantity,
+            price: partToDelete.price,
+            category: partToDelete.category,
+            article_number: partToDelete.article_number
+          },
+          quantityBefore: partToDelete.quantity
+        });
+      }
     } catch (error) {
       console.error('Error deleting part:', error);
       alert('Er is een fout opgetreden bij het verwijderen');
@@ -421,6 +518,7 @@ function Inventory() {
     const part = parts.find(p => p.id === partId);
     if (!part) return;
 
+    const oldQuantity = part.quantity;
     const newQuantity = Math.max(0, part.quantity + delta);
 
     try {
@@ -433,6 +531,18 @@ function Inventory() {
       setParts(prev => prev.map(p => 
         p.id === partId ? { ...p, quantity: newQuantity } : p
       ));
+
+      // Log history
+      await logInventoryHistory(
+        delta > 0 ? 'voorraad_verhoogd' : 'voorraad_verlaagd',
+        part.name,
+        {
+          itemId: partId,
+          changes: { quantity: { van: oldQuantity, naar: newQuantity } },
+          quantityBefore: oldQuantity,
+          quantityAfter: newQuantity
+        }
+      );
     } catch (error) {
       console.error('Error updating quantity:', error);
     }
@@ -674,6 +784,18 @@ function Inventory() {
       if (error) throw error;
       setParts(data || []);
 
+      // Log bulk import history
+      if (inserted > 0 || updated > 0) {
+        await logInventoryHistory('bulk_import', `Bulk import (${inserted} nieuw, ${updated} bijgewerkt)`, {
+          changes: {
+            inserted,
+            updated,
+            errors: errors.length,
+            total_items: itemsToInsert.length
+          }
+        });
+      }
+
       // Show success message
       if (errors.length > 0) {
         setBulkImportSuccess(`${inserted} items toegevoegd, ${updated} items bijgewerkt. ${errors.length} fouten: ${errors.join('; ')}`);
@@ -753,6 +875,13 @@ function Inventory() {
       <div className="inventory-header">
         <h1>Voorraad</h1>
         <div className="header-actions">
+          <button className="btn-history" onClick={() => { setShowHistoryModal(true); loadHistory(); }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            Geschiedenis
+          </button>
           <button className="btn-export" onClick={() => alert('Export functionaliteit komt binnenkort')}>
             Exporteren
           </button>
@@ -1329,6 +1458,217 @@ function Inventory() {
                 disabled={saving}
               >
                 {saving ? 'Opslaan...' : (editingPart ? 'Bijwerken' : 'Toevoegen')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {showHistoryModal && (
+        <div className="modal-overlay" onClick={() => setShowHistoryModal(false)}>
+          <div className="modal-content history-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Voorraad Geschiedenis</h2>
+              <button className="close-button" onClick={() => setShowHistoryModal(false)}>×</button>
+            </div>
+            <div className="history-filters">
+              <button 
+                className={`history-filter-btn ${historyFilter === 'alle' ? 'active' : ''}`}
+                onClick={() => setHistoryFilter('alle')}
+              >
+                Alle
+              </button>
+              <button 
+                className={`history-filter-btn ${historyFilter === 'toegevoegd' ? 'active' : ''}`}
+                onClick={() => setHistoryFilter('toegevoegd')}
+              >
+                Toegevoegd
+              </button>
+              <button 
+                className={`history-filter-btn ${historyFilter === 'bewerkt' ? 'active' : ''}`}
+                onClick={() => setHistoryFilter('bewerkt')}
+              >
+                Bewerkt
+              </button>
+              <button 
+                className={`history-filter-btn ${historyFilter === 'voorraad' ? 'active' : ''}`}
+                onClick={() => setHistoryFilter('voorraad')}
+              >
+                Voorraad
+              </button>
+              <button 
+                className={`history-filter-btn ${historyFilter === 'verwijderd' ? 'active' : ''}`}
+                onClick={() => setHistoryFilter('verwijderd')}
+              >
+                Verwijderd
+              </button>
+            </div>
+            <div className="modal-body history-body">
+              {historyLoading ? (
+                <div className="history-loading">Geschiedenis laden...</div>
+              ) : history.length === 0 ? (
+                <div className="history-empty">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                  </svg>
+                  <p>Nog geen geschiedenis beschikbaar</p>
+                  <span>Wijzigingen aan de voorraad worden hier bijgehouden</span>
+                </div>
+              ) : (
+                <div className="history-timeline">
+                  {history
+                    .filter(entry => {
+                      if (historyFilter === 'alle') return true;
+                      if (historyFilter === 'voorraad') return entry.action === 'voorraad_verhoogd' || entry.action === 'voorraad_verlaagd';
+                      return entry.action === historyFilter;
+                    })
+                    .map((entry) => (
+                    <div key={entry.id} className={`history-entry history-${entry.action}`}>
+                      <div className="history-icon">
+                        {entry.action === 'toegevoegd' && (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                          </svg>
+                        )}
+                        {entry.action === 'bewerkt' && (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                          </svg>
+                        )}
+                        {entry.action === 'verwijderd' && (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                          </svg>
+                        )}
+                        {entry.action === 'voorraad_verhoogd' && (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                            <polyline points="17 6 23 6 23 12"></polyline>
+                          </svg>
+                        )}
+                        {entry.action === 'voorraad_verlaagd' && (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
+                            <polyline points="17 18 23 18 23 12"></polyline>
+                          </svg>
+                        )}
+                        {entry.action === 'bulk_import' && (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                          </svg>
+                        )}
+                      </div>
+                      <div className="history-content">
+                        <div className="history-title">
+                          <span className={`history-action-badge ${entry.action}`}>
+                            {entry.action === 'toegevoegd' && 'Toegevoegd'}
+                            {entry.action === 'bewerkt' && 'Bewerkt'}
+                            {entry.action === 'verwijderd' && 'Verwijderd'}
+                            {entry.action === 'voorraad_verhoogd' && 'Voorraad +'}
+                            {entry.action === 'voorraad_verlaagd' && 'Voorraad −'}
+                            {entry.action === 'bulk_import' && 'Bulk Import'}
+                          </span>
+                          <span className="history-item-name">{entry.item_name}</span>
+                        </div>
+                        
+                        {/* Show quantity change */}
+                        {(entry.action === 'voorraad_verhoogd' || entry.action === 'voorraad_verlaagd') && 
+                          entry.quantity_before !== null && entry.quantity_after !== null && (
+                          <div className="history-quantity-change">
+                            <span className="qty-old">{entry.quantity_before}</span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <line x1="5" y1="12" x2="19" y2="12"></line>
+                              <polyline points="12 5 19 12 12 19"></polyline>
+                            </svg>
+                            <span className="qty-new">{entry.quantity_after}</span>
+                          </div>
+                        )}
+
+                        {/* Show field changes for edits */}
+                        {entry.action === 'bewerkt' && entry.changes && Object.keys(entry.changes).length > 0 && (
+                          <div className="history-changes">
+                            {Object.entries(entry.changes).map(([field, change]) => (
+                              <div key={field} className="history-change-item">
+                                <span className="change-field">{
+                                  field === 'name' ? 'Naam' :
+                                  field === 'quantity' ? 'Aantal' :
+                                  field === 'price' ? 'Prijs' :
+                                  field === 'purchase_price' ? 'Inkoopprijs' :
+                                  field === 'category' ? 'Categorie' :
+                                  field === 'article_number' ? 'Artikelnr' :
+                                  field === 'min_quantity' ? 'Min. voorraad' :
+                                  field === 'location' ? 'Locatie' :
+                                  field === 'supplier' ? 'Leverancier' :
+                                  field === 'notes' ? 'Notities' :
+                                  field
+                                }: </span>
+                                <span className="change-old">{change.van || '-'}</span>
+                                <span className="change-arrow">→</span>
+                                <span className="change-new">{change.naar || '-'}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Show bulk import details */}
+                        {entry.action === 'bulk_import' && entry.changes && (
+                          <div className="history-changes">
+                            <div className="history-change-item">
+                              <span className="change-field">Nieuw: </span>
+                              <span className="change-new">{entry.changes.inserted || 0} items</span>
+                            </div>
+                            <div className="history-change-item">
+                              <span className="change-field">Bijgewerkt: </span>
+                              <span className="change-new">{entry.changes.updated || 0} items</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Show deleted item info */}
+                        {entry.action === 'verwijderd' && entry.old_values && (
+                          <div className="history-changes">
+                            {entry.old_values.quantity !== undefined && (
+                              <div className="history-change-item">
+                                <span className="change-field">Aantal was: </span>
+                                <span className="change-old">{entry.old_values.quantity}</span>
+                              </div>
+                            )}
+                            {entry.old_values.price && (
+                              <div className="history-change-item">
+                                <span className="change-field">Prijs was: </span>
+                                <span className="change-old">€{parseFloat(entry.old_values.price).toFixed(2)}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="history-time">
+                          {new Date(entry.created_at).toLocaleDateString('nl-NL', {
+                            weekday: 'short',
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })} om {new Date(entry.created_at).toLocaleTimeString('nl-NL', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setShowHistoryModal(false)}>
+                Sluiten
               </button>
             </div>
           </div>
