@@ -9,6 +9,49 @@ import './DriverDashboard.css';
 const MAPBOX_PUBLIC_TOKEN = process.env.REACT_APP_MAPBOX_PUBLIC_TOKEN || 'pk.eyJ1IjoiZmF0YmlrZWh1bHAiLCJhIjoiY21qNnhmanp5MDB4ajNncjB1YXJrMDc2cSJ9.5CYl4ZfCROi-pmyaNzETIg';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8001');
+
+// Twilio configuratie
+const TWILIO_ACCOUNT_SID = 'AC1872938f3ed5f3def7d8db76d8e68a6f';
+const TWILIO_AUTH_TOKEN = 'e4535fcdca48a8882243b980fe54ac64';
+const TWILIO_MESSAGING_SERVICE_SID = 'MGd8a966eafa5eb0ba0e0faf7440051fbc';
+
+const REVIEW_SMS_TEXT = 'Krijg €5 teruggestort op uw rekening na het achter laten van een positieve review via de onderstaande link https://g.page/r/CbN0OzH7sWQzEAE/review';
+
+// Functie om SMS te versturen via Twilio
+const sendReviewSMS = async (toPhoneNumber) => {
+  // Format het telefoonnummer naar internationaal formaat
+  let formattedPhone = toPhoneNumber.replace(/\s/g, '').replace(/-/g, '');
+  if (formattedPhone.startsWith('06')) {
+    formattedPhone = '+31' + formattedPhone.substring(1);
+  } else if (formattedPhone.startsWith('0')) {
+    formattedPhone = '+31' + formattedPhone.substring(1);
+  } else if (!formattedPhone.startsWith('+')) {
+    formattedPhone = '+31' + formattedPhone;
+  }
+
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
+  const body = new URLSearchParams({
+    To: formattedPhone,
+    MessagingServiceSid: TWILIO_MESSAGING_SERVICE_SID,
+    Body: REVIEW_SMS_TEXT
+  });
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Basic ' + btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`),
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: body.toString()
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || 'SMS versturen mislukt');
+  }
+
+  return await response.json();
+};
 const FRONTEND_BASE_URL = process.env.REACT_APP_FRONTEND_URL || (process.env.NODE_ENV === 'production' ? 'https://app.routenu.nl' : window.location.origin);
 
 function DriverDashboard() {
@@ -30,6 +73,36 @@ function DriverDashboard() {
   const [selectedPickedUpStops, setSelectedPickedUpStops] = useState([]);
   const [pickedUpBikes, setPickedUpBikes] = useState([]);
   const [routeStopDetails, setRouteStopDetails] = useState({}); // Store stop details per route
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewPhone, setReviewPhone] = useState('');
+  const [reviewSendingDashboard, setReviewSendingDashboard] = useState(false);
+  const [reviewSentDashboard, setReviewSentDashboard] = useState(false);
+  const [reviewErrorDashboard, setReviewErrorDashboard] = useState('');
+
+  const handleSendReviewFromDashboard = async () => {
+    if (!reviewPhone.trim()) {
+      setReviewErrorDashboard('Vul een telefoonnummer in');
+      return;
+    }
+    setReviewSendingDashboard(true);
+    setReviewErrorDashboard('');
+    try {
+      await sendReviewSMS(reviewPhone);
+      setReviewSentDashboard(true);
+    } catch (error) {
+      console.error('Error sending review SMS:', error);
+      setReviewErrorDashboard('SMS versturen mislukt: ' + error.message);
+    } finally {
+      setReviewSendingDashboard(false);
+    }
+  };
+
+  const closeReviewModal = () => {
+    setShowReviewModal(false);
+    setReviewPhone('');
+    setReviewSentDashboard(false);
+    setReviewErrorDashboard('');
+  };
 
   // Load stop details for a route
   const loadStopDetails = async (routeId) => {
@@ -986,6 +1059,60 @@ function DriverDashboard() {
         </div>
       </div>
 
+      {/* Review versturen knop */}
+      <div style={{ padding: '0 16px', marginBottom: '16px' }}>
+        <button
+          className="btn-review-sms"
+          onClick={() => setShowReviewModal(true)}
+        >
+          ⭐ Review versturen
+        </button>
+      </div>
+
+      {/* Review Modal */}
+      {showReviewModal && (
+        <div className="modal-overlay" onClick={closeReviewModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h2>Review SMS versturen</h2>
+              <button className="close-button" onClick={closeReviewModal}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label htmlFor="review-phone">Telefoonnummer</label>
+                <input
+                  type="tel"
+                  id="review-phone"
+                  value={reviewPhone}
+                  onChange={(e) => setReviewPhone(e.target.value)}
+                  placeholder="+31612345678"
+                  disabled={reviewSentDashboard}
+                />
+              </div>
+              <p style={{ fontSize: '13px', color: '#6b7280', margin: '8px 0 16px' }}>
+                Er wordt een SMS gestuurd met een link om een review achter te laten.
+              </p>
+              {reviewErrorDashboard && <p className="review-error">{reviewErrorDashboard}</p>}
+              {reviewSentDashboard && <p className="review-success">✅ SMS verstuurd naar {reviewPhone}</p>}
+              <div className="modal-actions">
+                <button type="button" className="btn-cancel" onClick={closeReviewModal}>
+                  Sluiten
+                </button>
+                <button
+                  type="button"
+                  className={`btn-review-sms ${reviewSentDashboard ? 'btn-review-sent' : ''}`}
+                  onClick={handleSendReviewFromDashboard}
+                  disabled={reviewSendingDashboard || reviewSentDashboard}
+                  style={{ flex: 1 }}
+                >
+                  {reviewSendingDashboard ? '⏳ Versturen...' : reviewSentDashboard ? '✅ Verstuurd!' : '📩 Versturen'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="routes-sections">
         {/* Huidige Route */}
         {currentRoutes.length > 0 && (
@@ -1271,6 +1398,27 @@ function StopDetailsModal({ stop, stopIndex, totalStops, onSave, onClose, existi
   const [amountReceived, setAmountReceived] = useState(existingDetails?.amountReceived || '');
   const [partsCost, setPartsCost] = useState(existingDetails?.partsCost || '');
   const [showMapChooser, setShowMapChooser] = useState(false);
+  const [reviewSending, setReviewSending] = useState(false);
+  const [reviewSent, setReviewSent] = useState(false);
+  const [reviewError, setReviewError] = useState('');
+
+  const handleSendReview = async () => {
+    if (!stop.phone) {
+      setReviewError('Geen telefoonnummer beschikbaar voor deze stop');
+      return;
+    }
+    setReviewSending(true);
+    setReviewError('');
+    try {
+      await sendReviewSMS(stop.phone);
+      setReviewSent(true);
+    } catch (error) {
+      console.error('Error sending review SMS:', error);
+      setReviewError('SMS versturen mislukt: ' + error.message);
+    } finally {
+      setReviewSending(false);
+    }
+  };
 
   // Reset form fields when stopIndex changes (new stop)
   useEffect(() => {
@@ -1382,6 +1530,21 @@ function StopDetailsModal({ stop, stopIndex, totalStops, onSave, onClose, existi
               </button>
             </div>
           </form>
+
+          {/* Review versturen knop */}
+          {stop.phone && (
+            <div className="review-sms-section">
+              <button
+                className={`btn-review-sms ${reviewSent ? 'btn-review-sent' : ''}`}
+                onClick={handleSendReview}
+                disabled={reviewSending || reviewSent}
+              >
+                {reviewSending ? '⏳ Versturen...' : reviewSent ? '✅ Review verstuurd!' : '⭐ Review versturen'}
+              </button>
+              {reviewError && <p className="review-error">{reviewError}</p>}
+              {reviewSent && <p className="review-success">SMS verstuurd naar {stop.phone}</p>}
+            </div>
+          )}
         </div>
       </div>
 

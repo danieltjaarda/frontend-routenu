@@ -5,6 +5,47 @@ import { supabase } from '../lib/supabase';
 import { getRouteStopTimestamps, recalculateArrivalTimes } from '../services/userData';
 import './DriverDashboard.css';
 
+// Twilio configuratie
+const TWILIO_ACCOUNT_SID = 'AC1872938f3ed5f3def7d8db76d8e68a6f';
+const TWILIO_AUTH_TOKEN = 'e4535fcdca48a8882243b980fe54ac64';
+const TWILIO_MESSAGING_SERVICE_SID = 'MGd8a966eafa5eb0ba0e0faf7440051fbc';
+
+const REVIEW_SMS_TEXT = 'Krijg €5 teruggestort op uw rekening na het achter laten van een positieve review via de onderstaande link https://g.page/r/CbN0OzH7sWQzEAE/review';
+
+const sendReviewSMS = async (toPhoneNumber) => {
+  let formattedPhone = toPhoneNumber.replace(/\s/g, '').replace(/-/g, '');
+  if (formattedPhone.startsWith('06')) {
+    formattedPhone = '+31' + formattedPhone.substring(1);
+  } else if (formattedPhone.startsWith('0')) {
+    formattedPhone = '+31' + formattedPhone.substring(1);
+  } else if (!formattedPhone.startsWith('+')) {
+    formattedPhone = '+31' + formattedPhone;
+  }
+
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
+  const body = new URLSearchParams({
+    To: formattedPhone,
+    MessagingServiceSid: TWILIO_MESSAGING_SERVICE_SID,
+    Body: REVIEW_SMS_TEXT
+  });
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Basic ' + btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`),
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: body.toString()
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || 'SMS versturen mislukt');
+  }
+
+  return await response.json();
+};
+
 function ContinueRoute() {
   const { routeId } = useParams();
   const navigate = useNavigate();
@@ -18,6 +59,22 @@ function ContinueRoute() {
   const [amountReceived, setAmountReceived] = useState('');
   const [partsCost, setPartsCost] = useState('');
   const [routeTimestamps, setRouteTimestamps] = useState([]);
+  const [reviewSending, setReviewSending] = useState(false);
+  const [reviewSent, setReviewSent] = useState({});  // track per stop index
+
+  const handleSendReview = async (phone, stopIndex) => {
+    if (!phone) return;
+    setReviewSending(true);
+    try {
+      await sendReviewSMS(phone);
+      setReviewSent(prev => ({ ...prev, [stopIndex]: true }));
+    } catch (error) {
+      console.error('Error sending review SMS:', error);
+      alert('SMS versturen mislukt: ' + error.message);
+    } finally {
+      setReviewSending(false);
+    }
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -149,14 +206,17 @@ function ContinueRoute() {
     }
 
     try {
+      const currentStopData = route.stops[currentStopIndex];
       const { error } = await supabase
         .from('route_stop_details')
         .upsert({
           route_id: routeId,
           stop_index: currentStopIndex,
+          stop_id: currentStopData?.id?.toString() || currentStopIndex.toString(),
           work_description: workDescription,
           amount_received: amountReceived ? parseFloat(amountReceived) : null,
-          parts_cost: partsCost ? parseFloat(partsCost) : null
+          parts_cost: partsCost ? parseFloat(partsCost) : null,
+          completed_at: new Date().toISOString()
         }, {
           onConflict: 'route_id,stop_index'
         });
@@ -347,6 +407,21 @@ function ContinueRoute() {
                 placeholder="0.00"
               />
             </div>
+            {/* Review versturen knop */}
+            {currentStop.phone && (
+              <div className="review-sms-section">
+                <button
+                  type="button"
+                  className={`btn-review-sms ${reviewSent[currentStopIndex] ? 'btn-review-sent' : ''}`}
+                  onClick={() => handleSendReview(currentStop.phone, currentStopIndex)}
+                  disabled={reviewSending || reviewSent[currentStopIndex]}
+                >
+                  {reviewSending ? '⏳ Versturen...' : reviewSent[currentStopIndex] ? '✅ Review verstuurd!' : '⭐ Review versturen'}
+                </button>
+                {reviewSent[currentStopIndex] && <p className="review-success">SMS verstuurd naar {currentStop.phone}</p>}
+              </div>
+            )}
+
             <div className="form-actions">
               <button type="button" className="btn-cancel" onClick={() => navigate('/monteur')}>
                 Annuleren

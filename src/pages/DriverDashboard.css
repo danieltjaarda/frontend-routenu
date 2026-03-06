@@ -1937,6 +1937,67 @@
   color: #34c759;
 }
 
+/* Review SMS Section */
+.review-sms-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e1e3e5;
+  text-align: center;
+}
+
+.btn-review-sms {
+  width: 100%;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  color: white;
+  border: none;
+  border-radius: 50px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-review-sms:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d97706, #ea580c);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.btn-review-sms:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-review-sent {
+  background: linear-gradient(135deg, #10b981, #059669) !important;
+}
+
+.btn-review-sent:hover {
+  background: linear-gradient(135deg, #10b981, #059669) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.review-error {
+  color: #dc2626;
+  font-size: 13px;
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
+.review-success {
+  color: #059669;
+  font-size: 13px;
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
 /* Safe Area for Notched Devices */
 @supports (padding: max(0px)) {
   .driver-dashboard {
