@@ -10,9 +10,13 @@ const MAPBOX_PUBLIC_TOKEN = process.env.REACT_APP_MAPBOX_PUBLIC_TOKEN || 'pk.eyJ
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8001');
 
-// Functie om review SMS te versturen via API endpoint
+// Functie om review SMS te versturen via Vercel serverless API
 const sendReviewSMS = async (toPhoneNumber) => {
-  const response = await fetch(`${API_BASE_URL}/send-review-sms`, {
+  const smsApiUrl = process.env.NODE_ENV === 'production' 
+    ? '/api/send-review-sms' 
+    : 'https://routenu.vercel.app/api/send-review-sms';
+
+  const response = await fetch(smsApiUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ to: toPhoneNumber })
