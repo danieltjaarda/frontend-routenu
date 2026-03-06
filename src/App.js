@@ -41,7 +41,7 @@ import './App.css';
 
 // Public token voor Mapbox GL JS (kaart) - stel in via REACT_APP_MAPBOX_PUBLIC_TOKEN in .env
 // Secret token wordt server-side gebruikt via /api/optimize-route
-const MAPBOX_PUBLIC_TOKEN = process.env.REACT_APP_MAPBOX_PUBLIC_TOKEN;
+const MAPBOX_PUBLIC_TOKEN = process.env.REACT_APP_MAPBOX_PUBLIC_TOKEN || 'pk.eyJ1IjoiZmF0YmlrZWh1bHAiLCJhIjoiY21qNnhmanp5MDB4ajNncjB1YXJrMDc2cSJ9.5CYl4ZfCROi-pmyaNzETIg';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8001');
 
