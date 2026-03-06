@@ -25,7 +25,7 @@ module.exports = async (req, res) => {
     }
 
     const TWILIO_ACCOUNT_SID = 'AC1872938f3ed5f3def7d8db76d8e68a6f';
-    const TWILIO_AUTH_TOKEN = 'e4535fcdca48a8882243b980fe54ac64';
+    const TWILIO_AUTH_TOKEN = '7592a3c7359d9e94e6d95648794103c1';
     const TWILIO_MESSAGING_SERVICE_SID = 'MGd8a966eafa5eb0ba0e0faf7440051fbc';
     const REVIEW_SMS_TEXT = 'Krijg €5 teruggestort op uw rekening na het achter laten van een positieve review via de onderstaande link https://g.page/r/CbN0OzH7sWQzEAE/review';
 
