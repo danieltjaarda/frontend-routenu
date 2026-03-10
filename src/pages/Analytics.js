@@ -149,6 +149,7 @@ function Analytics() {
   const [stopDetails, setStopDetails] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [periodFilter, setPeriodFilter] = useState('all');
+  const [periodOffset, setPeriodOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [btwPercentage, setBtwPercentage] = useState(() => {
@@ -261,47 +262,88 @@ function Analytics() {
     loadData();
   }, [currentUser]);
 
+  const getReferenceDate = () => {
+    const now = new Date();
+    switch (periodFilter) {
+      case 'day':
+        const dayRef = new Date(now);
+        dayRef.setDate(dayRef.getDate() + periodOffset);
+        return dayRef;
+      case 'week':
+        const weekRef = new Date(now);
+        weekRef.setDate(weekRef.getDate() + (periodOffset * 7));
+        return weekRef;
+      case 'month':
+        const monthRef = new Date(now.getFullYear(), now.getMonth() + periodOffset, 1);
+        return monthRef;
+      case 'quarter':
+        const quarterRef = new Date(now.getFullYear(), now.getMonth() + (periodOffset * 3), 1);
+        return quarterRef;
+      case 'year':
+        const yearRef = new Date(now.getFullYear() + periodOffset, 0, 1);
+        return yearRef;
+      case 'last30': {
+        const last30Ref = new Date(now);
+        last30Ref.setDate(last30Ref.getDate() + (periodOffset * 30));
+        return last30Ref;
+      }
+      default:
+        return now;
+    }
+  };
+
   // Filter routes and shop repairs based on selected period
   useEffect(() => {
     const filterByPeriod = (items, dateField = 'date') => {
       if (periodFilter === 'all') return items;
       if (periodFilter === 'date' && !selectedDate) return [];
 
-      const now = new Date();
+      const ref = getReferenceDate();
       return items.filter(item => {
         if (!item[dateField]) return false;
         const itemDate = new Date(item[dateField]);
         
         switch (periodFilter) {
           case 'day':
-            return itemDate.toDateString() === now.toDateString();
+            return itemDate.toDateString() === ref.toDateString();
           
           case 'date':
             if (!selectedDate) return false;
             const selected = new Date(selectedDate);
             return itemDate.toDateString() === selected.toDateString();
           
-          case 'week':
-            const weekStart = new Date(now);
-            weekStart.setDate(now.getDate() - now.getDay());
+          case 'week': {
+            const weekStart = new Date(ref);
+            weekStart.setDate(ref.getDate() - ref.getDay() + 1);
             weekStart.setHours(0, 0, 0, 0);
             const weekEnd = new Date(weekStart);
             weekEnd.setDate(weekStart.getDate() + 6);
             weekEnd.setHours(23, 59, 59, 999);
             return itemDate >= weekStart && itemDate <= weekEnd;
+          }
           
           case 'month':
-            return itemDate.getMonth() === now.getMonth() && 
-                   itemDate.getFullYear() === now.getFullYear();
+            return itemDate.getMonth() === ref.getMonth() && 
+                   itemDate.getFullYear() === ref.getFullYear();
           
-          case 'quarter':
-            const currentQuarter = Math.floor(now.getMonth() / 3);
+          case 'quarter': {
+            const targetQuarter = Math.floor(ref.getMonth() / 3);
             const itemQuarter = Math.floor(itemDate.getMonth() / 3);
-            return itemQuarter === currentQuarter && 
-                   itemDate.getFullYear() === now.getFullYear();
+            return itemQuarter === targetQuarter && 
+                   itemDate.getFullYear() === ref.getFullYear();
+          }
           
           case 'year':
-            return itemDate.getFullYear() === now.getFullYear();
+            return itemDate.getFullYear() === ref.getFullYear();
+          
+          case 'last30': {
+            const endDate = new Date(ref);
+            endDate.setHours(23, 59, 59, 999);
+            const startDate = new Date(ref);
+            startDate.setDate(startDate.getDate() - 29);
+            startDate.setHours(0, 0, 0, 0);
+            return itemDate >= startDate && itemDate <= endDate;
+          }
           
           default:
             return true;
@@ -311,7 +353,8 @@ function Analytics() {
 
     setRoutes(filterByPeriod(allRoutes));
     setShopRepairs(filterByPeriod(allShopRepairs));
-  }, [periodFilter, allRoutes, allShopRepairs, selectedDate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodFilter, periodOffset, allRoutes, allShopRepairs, selectedDate]);
 
   const loadStopDetails = async (routeId) => {
     try {
@@ -496,13 +539,17 @@ function Analytics() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
+    let cancelled = false;
+
     const loadTotals = async () => {
       if (routes.length === 0 && shopRepairs.length === 0) {
-        setTotals({ 
-          totalRevenue: 0, totalPartsCost: 0, totalVehicleCost: 0, totalDriverCost: 0, 
-          totalMonthlyCosts: 0, totalProfit: 0, totalDistance: 0, totalHours: 0,
-          shopRevenue: 0, shopPartsCost: 0, shopHours: 0, shopLaborCost: 0
-        });
+        if (!cancelled) {
+          setTotals({ 
+            totalRevenue: 0, totalPartsCost: 0, totalVehicleCost: 0, totalDriverCost: 0, 
+            totalMonthlyCosts: 0, totalProfit: 0, totalDistance: 0, totalHours: 0,
+            shopRevenue: 0, shopPartsCost: 0, shopHours: 0, shopLaborCost: 0
+          });
+        }
         return;
       }
 
@@ -514,12 +561,11 @@ function Analytics() {
       let totalDistance = 0;
       let totalHours = 0;
 
-      // Calculate shop repair totals
       let shopRevenue = 0;
       let shopPartsCost = 0;
       let shopHours = 0;
       let shopLaborCost = 0;
-      const LABOR_RATE = 20; // €20 per uur
+      const LABOR_RATE = 20;
       
       shopRepairs.forEach(repair => {
         shopRevenue += parseFloat(repair.revenue) || 0;
@@ -530,7 +576,7 @@ function Analytics() {
       });
 
       try {
-        let monthToCheck = new Date();
+        let monthToCheck = getReferenceDate();
         if (periodFilter === 'date' && selectedDate) {
           monthToCheck = new Date(selectedDate);
         }
@@ -546,6 +592,7 @@ function Analytics() {
           });
           
           for (const monthKey of uniqueMonths) {
+            if (cancelled) return;
             const [year, month] = monthKey.split('-');
             const monthDate = new Date(parseInt(year), parseInt(month) - 1, 1);
             const costs = await getMonthlyCostsForMonth(currentUser.id, monthDate);
@@ -555,17 +602,34 @@ function Analytics() {
           if (periodFilter === 'quarter') {
             const currentQuarter = Math.floor(monthToCheck.getMonth() / 3);
             for (let i = 0; i < 3; i++) {
+              if (cancelled) return;
               const monthDate = new Date(monthToCheck.getFullYear(), currentQuarter * 3 + i, 1);
               const costs = await getMonthlyCostsForMonth(currentUser.id, monthDate);
               totalMonthlyCosts += costs.reduce((sum, cost) => sum + (parseFloat(cost.amount) || 0), 0);
             }
           } else if (periodFilter === 'year') {
             for (let i = 0; i < 12; i++) {
+              if (cancelled) return;
               const monthDate = new Date(monthToCheck.getFullYear(), i, 1);
               const costs = await getMonthlyCostsForMonth(currentUser.id, monthDate);
               totalMonthlyCosts += costs.reduce((sum, cost) => sum + (parseFloat(cost.amount) || 0), 0);
             }
+          } else if (periodFilter === 'last30') {
+            const endDate = new Date(monthToCheck);
+            const startDate = new Date(monthToCheck);
+            startDate.setDate(startDate.getDate() - 29);
+            const uniqueMonths = new Set();
+            uniqueMonths.add(`${startDate.getFullYear()}-${startDate.getMonth()}`);
+            uniqueMonths.add(`${endDate.getFullYear()}-${endDate.getMonth()}`);
+            for (const key of uniqueMonths) {
+              if (cancelled) return;
+              const [y, m] = key.split('-');
+              const monthDate = new Date(parseInt(y), parseInt(m), 1);
+              const costs = await getMonthlyCostsForMonth(currentUser.id, monthDate);
+              totalMonthlyCosts += costs.reduce((sum, cost) => sum + (parseFloat(cost.amount) || 0), 0);
+            }
           } else {
+            if (cancelled) return;
             const costs = await getMonthlyCostsForMonth(currentUser.id, monthToCheck);
             totalMonthlyCosts += costs.reduce((sum, cost) => sum + (parseFloat(cost.amount) || 0), 0);
           }
@@ -574,60 +638,76 @@ function Analytics() {
         console.error('Error loading monthly costs:', error);
       }
 
-      for (const route of routes) {
+      if (cancelled) return;
+
+      // Fetch all route stop details in one query instead of one-by-one
+      const routeIds = routes.map(r => r.id);
+      let allDetails = [];
+      if (routeIds.length > 0) {
         try {
-          const { data: details } = await supabase
+          const { data } = await supabase
             .from('route_stop_details')
             .select('*')
-            .eq('route_id', route.id);
-
-          if (details) {
-            const revenue = details.reduce((sum, detail) => sum + (parseFloat(detail.amount_received) || 0), 0);
-            const partsCost = details.reduce((sum, detail) => sum + (parseFloat(detail.parts_cost) || 0), 0);
-            const vehicleCost = calculateVehicleCost(route);
-            const hoursWorked = parseFloat(route.hours_worked) || 0;
-            const hourlyRate = route.drivers?.hourly_rate ? parseFloat(route.drivers.hourly_rate) : 0;
-            const driverCost = hoursWorked * hourlyRate;
-
-            const distanceKm = route.actual_distance_km 
-              ? parseFloat(route.actual_distance_km) 
-              : (route.route_data?.distance ? route.route_data.distance / 1000 : 0);
-
-            totalRevenue += revenue;
-            totalPartsCost += partsCost;
-            totalVehicleCost += vehicleCost;
-            totalDriverCost += driverCost;
-            totalDistance += distanceKm;
-            totalHours += hoursWorked;
-          }
+            .in('route_id', routeIds);
+          allDetails = data || [];
         } catch (error) {
-          console.error(`Error loading details for route ${route.id}:`, error);
+          console.error('Error loading route stop details:', error);
         }
       }
 
-      // Include shop repairs in totals
+      if (cancelled) return;
+
+      for (const route of routes) {
+        const details = allDetails.filter(d => d.route_id === route.id);
+
+        const revenue = details.reduce((sum, detail) => sum + (parseFloat(detail.amount_received) || 0), 0);
+        const partsCost = details.reduce((sum, detail) => sum + (parseFloat(detail.parts_cost) || 0), 0);
+        const vehicleCost = calculateVehicleCost(route);
+        const hoursWorked = parseFloat(route.hours_worked) || 0;
+        const hourlyRate = route.drivers?.hourly_rate ? parseFloat(route.drivers.hourly_rate) : 0;
+        const driverCost = hoursWorked * hourlyRate;
+
+        const distanceKm = route.actual_distance_km 
+          ? parseFloat(route.actual_distance_km) 
+          : (route.route_data?.distance ? route.route_data.distance / 1000 : 0);
+
+        totalRevenue += revenue;
+        totalPartsCost += partsCost;
+        totalVehicleCost += vehicleCost;
+        totalDriverCost += driverCost;
+        totalDistance += distanceKm;
+        totalHours += hoursWorked;
+      }
+
       const combinedRevenue = totalRevenue + shopRevenue;
       const combinedPartsCost = totalPartsCost + shopPartsCost;
       const totalProfit = combinedRevenue - combinedPartsCost - totalVehicleCost - totalDriverCost - totalMonthlyCosts;
       
-      setTotals({ 
-        totalRevenue: combinedRevenue, 
-        totalPartsCost: combinedPartsCost, 
-        totalVehicleCost, 
-        totalDriverCost, 
-        totalMonthlyCosts,
-        totalProfit,
-        totalDistance,
-        totalHours,
-        shopRevenue,
-        shopPartsCost,
-        shopHours,
-        shopLaborCost
-      });
+      if (!cancelled) {
+        setTotals({ 
+          totalRevenue: combinedRevenue, 
+          totalPartsCost: combinedPartsCost, 
+          totalVehicleCost, 
+          totalDriverCost, 
+          totalMonthlyCosts,
+          totalProfit,
+          totalDistance,
+          totalHours,
+          shopRevenue,
+          shopPartsCost,
+          shopHours,
+          shopLaborCost
+        });
+      }
     };
     
     loadTotals();
-  }, [routes, shopRepairs, periodFilter, selectedDate, vehicles, currentUser]);
+
+    return () => {
+      cancelled = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routes, shopRepairs, periodFilter, periodOffset, selectedDate, vehicles, currentUser]);
 
   if (loading) {
     return (
@@ -641,12 +721,40 @@ function Analytics() {
   }
 
   const getPeriodLabel = () => {
+    const ref = getReferenceDate();
+    const fmtDate = { day: 'numeric', month: 'short' };
     switch (periodFilter) {
-      case 'day': return 'Vandaag';
-      case 'week': return 'Deze week';
-      case 'month': return 'Deze maand';
-      case 'quarter': return 'Dit kwartaal';
-      case 'year': return 'Dit jaar';
+      case 'day':
+        if (periodOffset === 0) return 'Vandaag';
+        if (periodOffset === -1) return 'Gisteren';
+        return ref.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'short' });
+      case 'week': {
+        if (periodOffset === 0) return 'Deze week';
+        if (periodOffset === -1) return 'Vorige week';
+        const ws = new Date(ref);
+        ws.setDate(ref.getDate() - ref.getDay() + 1);
+        const we = new Date(ws);
+        we.setDate(ws.getDate() + 6);
+        return `${ws.toLocaleDateString('nl-NL', fmtDate)} - ${we.toLocaleDateString('nl-NL', fmtDate)}`;
+      }
+      case 'month':
+        if (periodOffset === 0) return 'Deze maand';
+        return ref.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' });
+      case 'quarter': {
+        const q = Math.floor(ref.getMonth() / 3) + 1;
+        if (periodOffset === 0) return 'Dit kwartaal';
+        return `Q${q} ${ref.getFullYear()}`;
+      }
+      case 'year':
+        if (periodOffset === 0) return 'Dit jaar';
+        return `${ref.getFullYear()}`;
+      case 'last30': {
+        const endDate = new Date(ref);
+        const startDate = new Date(ref);
+        startDate.setDate(startDate.getDate() - 29);
+        if (periodOffset === 0) return 'Afgelopen 30 dagen';
+        return `${startDate.toLocaleDateString('nl-NL', fmtDate)} - ${endDate.toLocaleDateString('nl-NL', fmtDate)}`;
+      }
       case 'date': 
         if (selectedDate) {
           const date = new Date(selectedDate);
@@ -659,10 +767,14 @@ function Analytics() {
 
   const handlePeriodFilterChange = (value) => {
     setPeriodFilter(value);
+    setPeriodOffset(0);
     if (value !== 'date') {
       setSelectedDate('');
     }
   };
+
+  const canNavigate = periodFilter !== 'all' && periodFilter !== 'date';
+  const canGoForward = canNavigate && periodOffset < 0;
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('nl-NL', {
@@ -695,10 +807,35 @@ function Analytics() {
               <option value="day">Vandaag</option>
               <option value="week">Deze week</option>
               <option value="month">Deze maand</option>
+              <option value="last30">Afgelopen 30 dagen</option>
               <option value="quarter">Dit kwartaal</option>
               <option value="year">Dit jaar</option>
               <option value="date">Specifieke datum</option>
             </select>
+            {canNavigate && (
+              <div className="period-nav">
+                <button 
+                  className="period-nav-btn"
+                  onClick={() => setPeriodOffset(prev => prev - 1)}
+                  title="Vorige periode"
+                >
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 4L6 10L12 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                <span className="period-nav-label">{getPeriodLabel()}</span>
+                <button 
+                  className="period-nav-btn"
+                  onClick={() => setPeriodOffset(prev => prev + 1)}
+                  disabled={!canGoForward}
+                  title="Volgende periode"
+                >
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8 4L14 10L8 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+            )}
             {periodFilter === 'date' && (
               <input
                 type="date"

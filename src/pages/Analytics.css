@@ -113,6 +113,61 @@
   opacity: 1;
 }
 
+/* Period Navigation */
+.period-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: white;
+  border: 1.5px solid #e1e3e5;
+  border-radius: 9999px;
+  padding: 4px;
+  height: 44px;
+  box-sizing: border-box;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.period-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #1a1a1a;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.period-nav-btn:hover:not(:disabled) {
+  background: #f0fafb;
+  color: #0CC0DF;
+}
+
+.period-nav-btn:active:not(:disabled) {
+  background: #e0f5f8;
+  transform: scale(0.95);
+}
+
+.period-nav-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.period-nav-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+  white-space: nowrap;
+  min-width: 90px;
+  text-align: center;
+  padding: 0 4px;
+  user-select: none;
+}
+
 /* Settings Button */
 .btn-settings {
   width: 44px;
@@ -1303,6 +1358,16 @@
     flex: 1;
     min-width: 140px;
     height: 44px;
+  }
+
+  .period-nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .period-nav-label {
+    min-width: 0;
+    flex: 1;
   }
 
   .btn-settings {
