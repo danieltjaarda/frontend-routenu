@@ -449,6 +449,35 @@
   background: #0AA5C0;
 }
 
+.webhook-progress-container {
+  margin-top: 10px;
+  width: 100%;
+}
+
+.webhook-progress-bar {
+  width: 100%;
+  height: 12px;
+  background: #e0e0e0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.webhook-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0CC0DF, #0AA5C0);
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.webhook-progress-text {
+  display: block;
+  text-align: center;
+  font-size: 12px;
+  color: #555;
+  margin-top: 4px;
+  font-weight: 600;
+}
+
 .route-modal-warning {
   padding: 20px;
   background: #fff3cd;

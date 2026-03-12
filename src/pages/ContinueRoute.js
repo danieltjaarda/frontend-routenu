@@ -5,23 +5,22 @@ import { supabase } from '../lib/supabase';
 import { getRouteStopTimestamps, recalculateArrivalTimes } from '../services/userData';
 import './DriverDashboard.css';
 
-// Functie om review SMS te versturen via Vercel serverless API
+// Functie om review webhook te versturen
 const sendReviewSMS = async (toPhoneNumber) => {
-  const smsApiUrl = process.env.NODE_ENV === 'production' 
-    ? '/api/send-review-sms' 
-    : 'https://routenu.vercel.app/api/send-review-sms';
-
-  const response = await fetch(smsApiUrl, {
+  const response = await fetch('https://editorial-neighbors-periodic-angel.trycloudflare.com/api/webhook', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ to: toPhoneNumber })
+    body: JSON.stringify({
+      phone: toPhoneNumber || '',
+      message: `Bedankt voor uw afspraak met Fatbikehulp! Wilt u een gratis remschijf opgestuurd krijgen t.w.v. €20? Schrijf dan een positieve review via de onderstaande link:\n\nhttps://g.page/r/CbN0OzH7sWQzEBM/review\n\nAlvast bedankt!\n\nMet vriendelijke groet,\nFatbikehulp`
+    })
   });
 
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.error || 'SMS versturen mislukt');
+    throw new Error('Webhook versturen mislukt');
   }
-  return data;
+  return { success: true };
 };
 
 function ContinueRoute() {

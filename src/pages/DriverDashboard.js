@@ -10,23 +10,21 @@ const MAPBOX_PUBLIC_TOKEN = process.env.REACT_APP_MAPBOX_PUBLIC_TOKEN || 'pk.eyJ
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8001');
 
-// Functie om review SMS te versturen via Vercel serverless API
+// Functie om review webhook te versturen
 const sendReviewSMS = async (toPhoneNumber) => {
-  const smsApiUrl = process.env.NODE_ENV === 'production' 
-    ? '/api/send-review-sms' 
-    : 'https://routenu.vercel.app/api/send-review-sms';
-
-  const response = await fetch(smsApiUrl, {
+  const response = await fetch('https://editorial-neighbors-periodic-angel.trycloudflare.com/api/webhook', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ to: toPhoneNumber })
+    body: JSON.stringify({
+      phone: toPhoneNumber || '',
+      message: `Bedankt voor uw afspraak met Fatbikehulp! Wilt u een gratis remschijf opgestuurd krijgen t.w.v. €20? Schrijf dan een positieve review via de onderstaande link:\n\nhttps://g.page/r/CbN0OzH7sWQzEBM/review\n\nAlvast bedankt!\n\nMet vriendelijke groet,\nFatbikehulp`
+    })
   });
 
-  const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.error || 'SMS versturen mislukt');
+    throw new Error('Webhook versturen mislukt');
   }
-  return data;
+  return { success: true };
 };
 const FRONTEND_BASE_URL = process.env.REACT_APP_FRONTEND_URL || (process.env.NODE_ENV === 'production' ? 'https://app.routenu.nl' : window.location.origin);
 
@@ -285,6 +283,33 @@ function DriverDashboard() {
       };
       console.log('Sending route started emails for route:', routeForEmail.id, 'with user_id:', routeForEmail.user_id, 'stops count:', routeForEmail.stops?.length, 'stop_tokens:', stopTokens);
       await sendRouteStartedEmails(routeForEmail, liveRouteToken);
+
+      // Verstuur webhook naar elke stop met persoonlijke live tracking link
+      const routeDatum = route.date
+        ? new Date(route.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+        : 'vandaag';
+
+      for (let i = 0; i < route.stops.length; i++) {
+        const stop = route.stops[i];
+        const encodedEmail = stop.email ? encodeURIComponent(stop.email.trim().toLowerCase()) : null;
+        const personalRouteLink = encodedEmail
+          ? `${FRONTEND_BASE_URL}/route/${routeId}/${liveRouteToken}/${encodedEmail}`
+          : `${FRONTEND_BASE_URL}/route/${routeId}/${liveRouteToken}`;
+
+        try {
+          await fetch('https://editorial-neighbors-periodic-angel.trycloudflare.com/api/webhook', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              phone: stop.phone || '',
+              message: `Goedemorgen! De route van ${routeDatum} is gestart. U kunt de live tracking volgen via deze link: ${personalRouteLink}\n\nU wordt ook ruim 1 uur van tevoren gebeld.\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`
+            })
+          });
+          console.log(`✅ Route gestart webhook sent for stop ${i + 1}: ${stop.name}`);
+        } catch (err) {
+          console.error(`❌ Route gestart webhook failed for stop ${i + 1}: ${stop.name}`, err);
+        }
+      }
     } catch (error) {
       console.error('Error starting route:', error);
       alert('Fout bij het starten van de route: ' + error.message);
@@ -1659,6 +1684,22 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
   const [showMapChooser, setShowMapChooser] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [selectedCoordinates, setSelectedCoordinates] = useState(null);
+  const [reviewSending, setReviewSending] = useState({});
+  const [reviewSent, setReviewSent] = useState({});
+
+  const handleSendReviewForStop = async (phone, stopIndex) => {
+    if (!phone) return;
+    setReviewSending(prev => ({ ...prev, [stopIndex]: true }));
+    try {
+      await sendReviewSMS(phone);
+      setReviewSent(prev => ({ ...prev, [stopIndex]: true }));
+    } catch (error) {
+      console.error('Error sending review webhook:', error);
+      alert('Review versturen mislukt: ' + error.message);
+    } finally {
+      setReviewSending(prev => ({ ...prev, [stopIndex]: false }));
+    }
+  };
 
   const formatTime = (timeString) => {
     if (!timeString) return '--:--';
@@ -1919,6 +1960,18 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
                           </div>
                         )}
                       </div>
+                      {stop.phone && (
+                        <div className="review-sms-section" style={{ marginTop: '8px' }}>
+                          <button
+                            type="button"
+                            className={`btn-review-sms ${reviewSent[index] ? 'btn-review-sent' : ''}`}
+                            onClick={() => handleSendReviewForStop(stop.phone, index)}
+                            disabled={reviewSending[index] || reviewSent[index]}
+                          >
+                            {reviewSending[index] ? '⏳ Versturen...' : reviewSent[index] ? '✅ Review verstuurd!' : '⭐ Review versturen'}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })

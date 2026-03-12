@@ -36,6 +36,7 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, onReverseRoute, 
   const [tempDepartureTime, setTempDepartureTime] = useState(departureTime || '08:00');
   const [isInformingCustomers, setIsInformingCustomers] = useState(false);
   const [customersInformedAt, setCustomersInformedAt] = useState(null);
+  const [webhookProgress, setWebhookProgress] = useState(null);
 
   // Update tempDepartureTime when departureTime prop changes
   React.useEffect(() => {
@@ -186,19 +187,44 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, onReverseRoute, 
       return;
     }
 
-    // Verzamel alle e-mailadressen uit de stops
+    setIsInformingCustomers(true);
+    setWebhookProgress({ current: 0, total: stops.length, failed: 0 });
+
+    // Verstuur webhook voor ELKE stop (sequentieel met voortgangsbalk)
+    const routeDatum = routeDate
+      ? new Date(routeDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+      : 'nog niet bepaald';
+    let webhooksFailed = 0;
+
+    for (let i = 0; i < stops.length; i++) {
+      const stop = stops[i];
+      try {
+        await fetch('https://editorial-neighbors-periodic-angel.trycloudflare.com/api/webhook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: stop.phone || '',
+            message: `Even ter herinnering: u staat ingepland voor de route op ${routeDatum}. In de ochtend tussen 09:00 en 13:00 ontvangt u de live tracking. U wordt ook ruim 1 uur van tevoren gebeld.\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`
+          })
+        });
+        console.log(`✅ Webhook sent for stop ${i + 1}/${stops.length}: ${stop.name}`);
+      } catch (err) {
+        console.error(`❌ Webhook failed for stop ${i + 1}/${stops.length}: ${stop.name}`, err);
+        webhooksFailed++;
+      }
+      setWebhookProgress({ current: i + 1, total: stops.length, failed: webhooksFailed });
+    }
+
+    // Verzamel e-mailadressen voor e-mail verzending
     const emailAddresses = stops
       .map(stop => stop.email)
       .filter(email => email && email.trim() !== '');
 
-    if (emailAddresses.length === 0) {
-      alert('Geen e-mailadressen gevonden in de stops. Voeg e-mailadressen toe aan de stops.');
-      return;
-    }
-
-    setIsInformingCustomers(true);
-
     try {
+      if (emailAddresses.length === 0) {
+        // Geen e-mails om te sturen, webhooks zijn al verstuurd
+        return;
+      }
       // Haal de opgeslagen template op
       let savedTemplate;
       try {
@@ -525,13 +551,39 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, onReverseRoute, 
         }
 
         alert(`Alle e-mails succesvol verzonden naar ${successful} klant(en)!`);
-      } else {
+      } else if (emailAddresses.length > 0) {
         alert(`${successful} e-mail(s) verzonden, ${failed} mislukt. Check de console voor details.`);
       }
     } catch (error) {
       console.error('Error informing customers:', error);
       alert('Fout bij het informeren van klanten: ' + (error.message || 'Onbekende fout'));
     } finally {
+      // Toon resultaat van webhooks
+      if (webhooksFailed === 0) {
+        if (emailAddresses.length === 0) {
+          alert(`Alle ${stops.length} webhook(s) succesvol verzonden!`);
+        }
+      } else {
+        alert(`${stops.length - webhooksFailed} webhook(s) verzonden, ${webhooksFailed} mislukt.`);
+      }
+
+      // Update customers_informed_at
+      if (currentUser && currentRouteId) {
+        try {
+          const { error: updateError } = await supabase
+            .from('routes')
+            .update({ customers_informed_at: new Date().toISOString() })
+            .eq('id', currentRouteId)
+            .eq('user_id', currentUser.id);
+          if (!updateError) {
+            setCustomersInformedAt(new Date().toISOString());
+          }
+        } catch (e) {
+          console.error('Error updating customers_informed_at:', e);
+        }
+      }
+
+      setTimeout(() => setWebhookProgress(null), 2000);
       setIsInformingCustomers(false);
     }
   };
@@ -748,6 +800,20 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, onReverseRoute, 
           >
             {isInformingCustomers ? 'Verzenden...' : 'Klanten informeren'}
           </button>
+          {webhookProgress && (
+            <div className="webhook-progress-container">
+              <div className="webhook-progress-bar">
+                <div 
+                  className="webhook-progress-fill"
+                  style={{ width: `${(webhookProgress.current / webhookProgress.total) * 100}%` }}
+                />
+              </div>
+              <span className="webhook-progress-text">
+                {webhookProgress.current}/{webhookProgress.total} verzonden
+                {webhookProgress.failed > 0 && ` (${webhookProgress.failed} mislukt)`}
+              </span>
+            </div>
+          )}
           {customersInformedAt && (
             <div className="customers-informed-info">
               Laatst geïnformeerd: {new Date(customersInformedAt).toLocaleString('nl-NL', {

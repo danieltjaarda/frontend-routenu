@@ -101,16 +101,8 @@ app.post('/api/send-webhook', async (req, res) => {
     // Voeg specifieke data toe op basis van template type
     if (templateType === 'klant-aangemeld') {
       payload = {
-        ...payload,
-        event: 'customer_registered',
-        customer_name: data.stopName || data.name || '',
-        customer_email: data.email || '',
-        customer_phone: data.phone || '',
-        customer_address: data.stopAddress || data.address || '',
-        route_name: data.routeName || '',
-        route_date: data.routeDate || '',
-        route_link: data.routeLink || '',
-        live_route_link: data.liveRouteLink || data.routeLink || ''
+        phone: data.phone || '',
+        message: 'Hallo, dit is een automatisch bericht!'
       };
     } else if (templateType === 'klanten-informeren') {
       // Check if this is individual customer data (like klant-aangemeld) or bulk data

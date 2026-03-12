@@ -414,21 +414,6 @@ function AppContent() {
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Error sending welcome email:', errorData);
-      } else {
-        // Verstuur webhook als e-mail succesvol is verzonden en webhook URL bestaat
-        if (savedTemplate.webhook_url) {
-          await sendWebhook(savedTemplate.webhook_url, 'klant-aangemeld', {
-            stopName: stop.name || '',
-            name: stop.name || '',
-            email: stop.email || '',
-            phone: stop.phone || '',
-            stopAddress: stop.address || '',
-            address: stop.address || '',
-            routeName: routeNameForTemplate,
-            routeDate: routeDateForTemplate,
-            routeLink: routeLink
-          });
-        }
       }
     } catch (error) {
       console.error('Error sending welcome email:', error);
@@ -469,6 +454,24 @@ function AppContent() {
             ? `Route ${new Date(selectedRouteDate).toLocaleDateString('nl-NL')}` 
             : 'Route';
           sendWelcomeEmail(newStop, routeNameForEmail, selectedRouteDate, currentRouteId);
+        }
+
+        // Verstuur webhook ALTIJD bij het toevoegen van een stop (direct naar cloudflare)
+        try {
+          const routeDatum = selectedRouteDate 
+            ? new Date(selectedRouteDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+            : 'nog niet bepaald';
+          await fetch('https://editorial-neighbors-periodic-angel.trycloudflare.com/api/webhook', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              phone: newStop.phone || '',
+              message: `Beste klant, welkom bij Fatbikehulp! U bent aangemeld voor de route op ${routeDatum}. Bekijk deze pagina voor meer informatie: fatbikehulp.nl/informatie\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`
+            })
+          });
+          console.log('Webhook sent successfully for new stop');
+        } catch (webhookError) {
+          console.error('Error sending stop webhook:', webhookError);
         }
       } catch (error) {
         console.error('Error saving order:', error);
