@@ -204,7 +204,8 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, onReverseRoute, 
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             phone: stop.phone || '',
-            message: `Even ter herinnering: u staat ingepland voor de route op ${routeDatum}. In de ochtend tussen 09:00 en 13:00 ontvangt u de live tracking. U wordt ook ruim 1 uur van tevoren gebeld.\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`
+            message: `Even ter herinnering: u staat ingepland voor de route op ${routeDatum}. In de ochtend tussen 09:00 en 13:00 ontvangt u de live tracking. U wordt ook ruim 1 uur van tevoren gebeld.\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`,
+            profile: 'default'
           })
         });
         console.log(`✅ Webhook sent for stop ${i + 1}/${stops.length}: ${stop.name}`);

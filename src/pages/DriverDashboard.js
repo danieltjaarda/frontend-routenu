@@ -17,7 +17,8 @@ const sendReviewSMS = async (toPhoneNumber) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       phone: toPhoneNumber || '',
-      message: `Bedankt voor uw afspraak met Fatbikehulp! Wilt u een gratis remschijf opgestuurd krijgen t.w.v. €20? Schrijf dan een positieve review via de onderstaande link:\n\nhttps://g.page/r/CbN0OzH7sWQzEBM/review\n\nAlvast bedankt!\n\nMet vriendelijke groet,\nFatbikehulp`
+      message: `Bedankt voor uw afspraak met Fatbikehulp! Wilt u een gratis remschijf opgestuurd krijgen t.w.v. €20? Schrijf dan een positieve review via de onderstaande link:\n\nhttps://g.page/r/CbN0OzH7sWQzEBM/review\n\nAlvast bedankt!\n\nMet vriendelijke groet,\nFatbikehulp`,
+      profile: 'default'
     })
   });
 
@@ -302,7 +303,8 @@ function DriverDashboard() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               phone: stop.phone || '',
-              message: `Goedemorgen! De route van ${routeDatum} is gestart. U kunt de live tracking volgen via deze link: ${personalRouteLink}\n\nU wordt ook ruim 1 uur van tevoren gebeld.\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`
+              message: `Goedemorgen! De route van ${routeDatum} is gestart. U kunt de live tracking volgen via deze link: ${personalRouteLink}\n\nU wordt ook ruim 1 uur van tevoren gebeld.\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`,
+              profile: 'default'
             })
           });
           console.log(`✅ Route gestart webhook sent for stop ${i + 1}: ${stop.name}`);
@@ -1708,7 +1710,8 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phone: stop.phone || '',
-          message: `Goedemorgen! De route van ${routeDatum} is gestart. U kunt de live tracking volgen via deze link: ${personalRouteLink}\n\nU wordt ook ruim 1 uur van tevoren gebeld.\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`
+          message: `Goedemorgen! De route van ${routeDatum} is gestart. U kunt de live tracking volgen via deze link: ${personalRouteLink}\n\nU wordt ook ruim 1 uur van tevoren gebeld.\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`,
+          profile: 'default'
         })
       });
       setTrackingSent(prev => ({ ...prev, [stopIndex]: true }));

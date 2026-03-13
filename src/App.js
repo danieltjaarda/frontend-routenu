@@ -466,7 +466,8 @@ function AppContent() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               phone: newStop.phone || '',
-              message: `Beste klant, welkom bij Fatbikehulp! U bent aangemeld voor de route op ${routeDatum}. Bekijk deze pagina voor meer informatie: fatbikehulp.nl/informatie\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`
+              message: `Beste klant, welkom bij Fatbikehulp! U bent aangemeld voor de route op ${routeDatum}. Bekijk deze pagina voor meer informatie: fatbikehulp.nl/informatie\n\nWilt u de tracking ontvangen? Vul dan dit formulier in: https://www.fatbikehulp.nl/klant-registratie\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`,
+              profile: 'default'
             })
           });
           console.log('Webhook sent successfully for new stop');

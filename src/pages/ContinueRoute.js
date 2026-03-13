@@ -12,7 +12,8 @@ const sendReviewSMS = async (toPhoneNumber) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       phone: toPhoneNumber || '',
-      message: `Bedankt voor uw afspraak met Fatbikehulp! Wilt u een gratis remschijf opgestuurd krijgen t.w.v. €20? Schrijf dan een positieve review via de onderstaande link:\n\nhttps://g.page/r/CbN0OzH7sWQzEBM/review\n\nAlvast bedankt!\n\nMet vriendelijke groet,\nFatbikehulp`
+      message: `Bedankt voor uw afspraak met Fatbikehulp! Wilt u een gratis remschijf opgestuurd krijgen t.w.v. €20? Schrijf dan een positieve review via de onderstaande link:\n\nhttps://g.page/r/CbN0OzH7sWQzEBM/review\n\nAlvast bedankt!\n\nMet vriendelijke groet,\nFatbikehulp`,
+      profile: 'default'
     })
   });
 
