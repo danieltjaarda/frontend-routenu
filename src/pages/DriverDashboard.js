@@ -1686,6 +1686,39 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
   const [selectedCoordinates, setSelectedCoordinates] = useState(null);
   const [reviewSending, setReviewSending] = useState({});
   const [reviewSent, setReviewSent] = useState({});
+  const [trackingSending, setTrackingSending] = useState({});
+  const [trackingSent, setTrackingSent] = useState({});
+
+  const handleSendTrackingForStop = async (stop, stopIndex) => {
+    if (!stop.phone) return;
+    setTrackingSending(prev => ({ ...prev, [stopIndex]: true }));
+    try {
+      const routeDatum = route.date
+        ? new Date(route.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+        : 'vandaag';
+      const encodedEmail = stop.email ? encodeURIComponent(stop.email.trim().toLowerCase()) : null;
+      const personalRouteLink = encodedEmail && route.live_route_token
+        ? `${FRONTEND_BASE_URL}/route/${route.id}/${route.live_route_token}/${encodedEmail}`
+        : route.live_route_token
+          ? `${FRONTEND_BASE_URL}/route/${route.id}/${route.live_route_token}`
+          : `${FRONTEND_BASE_URL}/route/${route.id}`;
+
+      await fetch('https://editorial-neighbors-periodic-angel.trycloudflare.com/api/webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: stop.phone || '',
+          message: `Goedemorgen! De route van ${routeDatum} is gestart. U kunt de live tracking volgen via deze link: ${personalRouteLink}\n\nU wordt ook ruim 1 uur van tevoren gebeld.\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`
+        })
+      });
+      setTrackingSent(prev => ({ ...prev, [stopIndex]: true }));
+    } catch (error) {
+      console.error('Error sending tracking webhook:', error);
+      alert('Live tracking versturen mislukt: ' + error.message);
+    } finally {
+      setTrackingSending(prev => ({ ...prev, [stopIndex]: false }));
+    }
+  };
 
   const handleSendReviewForStop = async (phone, stopIndex) => {
     if (!phone) return;
@@ -1961,12 +1994,24 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
                         )}
                       </div>
                       {stop.phone && (
-                        <div className="review-sms-section" style={{ marginTop: '8px' }}>
+                        <div className="review-sms-section" style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {route.live_route_token && (
+                            <button
+                              type="button"
+                              className={`btn-review-sms ${trackingSent[index] ? 'btn-review-sent' : ''}`}
+                              onClick={() => handleSendTrackingForStop(stop, index)}
+                              disabled={trackingSending[index] || trackingSent[index]}
+                              style={{ flex: 1 }}
+                            >
+                              {trackingSending[index] ? '⏳ Versturen...' : trackingSent[index] ? '✅ Verstuurd!' : '📍 Live tracking versturen'}
+                            </button>
+                          )}
                           <button
                             type="button"
                             className={`btn-review-sms ${reviewSent[index] ? 'btn-review-sent' : ''}`}
                             onClick={() => handleSendReviewForStop(stop.phone, index)}
                             disabled={reviewSending[index] || reviewSent[index]}
+                            style={{ flex: 1 }}
                           >
                             {reviewSending[index] ? '⏳ Versturen...' : reviewSent[index] ? '✅ Review verstuurd!' : '⭐ Review versturen'}
                           </button>
