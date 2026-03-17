@@ -118,7 +118,7 @@ function Routes({ onSelectRoute }) {
       if (!route) return;
 
       await saveRoute(currentUser.id, {
-        ...route,
+        id: route.id,
         name: editingRouteName.trim() || route.name
       });
 
