@@ -1648,6 +1648,23 @@
   background: #0AA5C0;
 }
 
+.btn-delete-route {
+  padding: 8px 16px;
+  background: #fee2e2;
+  color: #dc2626;
+  border: none;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+
+.btn-delete-route:hover {
+  background: #fecaca;
+}
+
 .complete-route-form {
   margin-top: 16px;
   padding-top: 16px;

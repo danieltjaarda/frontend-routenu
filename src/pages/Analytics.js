@@ -1444,22 +1444,43 @@ function Analytics() {
                             </span>
                           </div>
                         </div>
-                        <button
-                          className="btn-complete-route"
-                          onClick={() => {
-                            if (isCompleting) {
-                              setCompletingRoute(null);
-                              setCompleteHours('');
-                              setCompleteKm('');
-                            } else {
-                              setCompletingRoute(route);
-                              setCompleteHours(route.hours_worked?.toString() || '');
-                              setCompleteKm(route.actual_distance_km?.toString() || '');
-                            }
-                          }}
-                        >
-                          {isCompleting ? 'Annuleren' : 'Afronden'}
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            className="btn-complete-route"
+                            onClick={() => {
+                              if (isCompleting) {
+                                setCompletingRoute(null);
+                                setCompleteHours('');
+                                setCompleteKm('');
+                              } else {
+                                setCompletingRoute(route);
+                                setCompleteHours(route.hours_worked?.toString() || '');
+                                setCompleteKm(route.actual_distance_km?.toString() || '');
+                              }
+                            }}
+                          >
+                            {isCompleting ? 'Annuleren' : 'Afronden'}
+                          </button>
+                          <button
+                            className="btn-delete-route"
+                            onClick={async () => {
+                              if (!window.confirm(`Weet je zeker dat je "${route.name || 'deze route'}" wilt verwijderen?`)) return;
+                              try {
+                                const { error } = await supabase
+                                  .from('routes')
+                                  .delete()
+                                  .eq('id', route.id);
+                                if (error) throw error;
+                                setUnfinishedRoutes(prev => prev.filter(r => r.id !== route.id));
+                              } catch (err) {
+                                console.error('Error deleting route:', err);
+                                alert('Fout bij het verwijderen: ' + err.message);
+                              }
+                            }}
+                          >
+                            Verwijderen
+                          </button>
+                        </div>
                       </div>
 
                       {isCompleting && (
