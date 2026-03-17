@@ -144,6 +144,10 @@ function Analytics() {
   const [routes, setRoutes] = useState([]);
   const [allRoutes, setAllRoutes] = useState([]);
   const [activeRoutes, setActiveRoutes] = useState([]);
+  const [unfinishedRoutes, setUnfinishedRoutes] = useState([]);
+  const [completingRoute, setCompletingRoute] = useState(null);
+  const [completeHours, setCompleteHours] = useState('');
+  const [completeKm, setCompleteKm] = useState('');
   const [loading, setLoading] = useState(true);
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [stopDetails, setStopDetails] = useState([]);
@@ -172,7 +176,7 @@ function Analytics() {
     labor_hours: '',
     btw_percentage: '21'
   });
-  const [activeTab, setActiveTab] = useState('routes'); // 'routes' or 'shop'
+  const [activeTab, setActiveTab] = useState('routes'); // 'routes', 'shop', or 'unfinished'
 
   useEffect(() => {
     const loadData = async () => {
@@ -231,6 +235,28 @@ function Analytics() {
           console.error('Error loading active routes:', activeRoutesError);
         } else {
           setActiveRoutes(activeRoutesData || []);
+        }
+
+        // Load unfinished routes (started but not completed, past date)
+        const { data: unfinishedData, error: unfinishedError } = await supabase
+          .from('routes')
+          .select(`
+            *,
+            drivers (
+              name,
+              email,
+              hourly_rate
+            )
+          `)
+          .eq('user_id', currentUser.id)
+          .in('route_status', ['started', 'planned'])
+          .lt('date', todayStr)
+          .order('date', { ascending: false });
+
+        if (unfinishedError) {
+          console.error('Error loading unfinished routes:', unfinishedError);
+        } else {
+          setUnfinishedRoutes(unfinishedData || []);
         }
         
         // Load shop repairs
@@ -1175,6 +1201,18 @@ function Analytics() {
           </svg>
           Winkelreparaties ({shopRepairs.length})
         </button>
+        {unfinishedRoutes.length > 0 && (
+          <button 
+            className={`tab-button ${activeTab === 'unfinished' ? 'active' : ''}`}
+            onClick={() => setActiveTab('unfinished')}
+          >
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="2"/>
+              <path d="M10 6V10L13 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+            Niet afgerond ({unfinishedRoutes.length})
+          </button>
+        )}
       </div>
 
       <div className="analytics-content">
@@ -1368,6 +1406,149 @@ function Analytics() {
                 </tbody>
               </table>
               </>
+            )}
+          </>
+        ) : activeTab === 'unfinished' ? (
+          // Unfinished Routes Tab
+          <>
+            <div className="content-header">
+              <h2>Niet afgeronde routes</h2>
+              <span className="route-count">{unfinishedRoutes.length} {unfinishedRoutes.length === 1 ? 'route' : 'routes'}</span>
+            </div>
+
+            {unfinishedRoutes.length === 0 ? (
+              <div className="empty-analytics">
+                <p>Geen niet-afgeronde routes gevonden.</p>
+              </div>
+            ) : (
+              <div className="unfinished-routes-list">
+                {unfinishedRoutes.map(route => {
+                  const routeDate = route.date
+                    ? new Date(route.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
+                    : '-';
+                  const driverName = route.drivers?.name || 'Geen chauffeur';
+                  const totalStops = route.stops?.length || 0;
+                  const isCompleting = completingRoute?.id === route.id;
+
+                  return (
+                    <div key={route.id} className="unfinished-route-card">
+                      <div className="unfinished-route-header">
+                        <div className="unfinished-route-info">
+                          <h3>{route.name || 'Route zonder naam'}</h3>
+                          <div className="unfinished-route-meta">
+                            <span>📅 {routeDate}</span>
+                            <span>👤 {driverName}</span>
+                            <span>📍 {totalStops} stops</span>
+                            <span className={`status-badge ${route.route_status}`}>
+                              {route.route_status === 'started' ? 'Gestart' : 'Gepland'}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          className="btn-complete-route"
+                          onClick={() => {
+                            if (isCompleting) {
+                              setCompletingRoute(null);
+                              setCompleteHours('');
+                              setCompleteKm('');
+                            } else {
+                              setCompletingRoute(route);
+                              setCompleteHours(route.hours_worked?.toString() || '');
+                              setCompleteKm(route.actual_distance_km?.toString() || '');
+                            }
+                          }}
+                        >
+                          {isCompleting ? 'Annuleren' : 'Afronden'}
+                        </button>
+                      </div>
+
+                      {isCompleting && (
+                        <div className="complete-route-form">
+                          <div className="complete-form-row">
+                            <div className="complete-form-field">
+                              <label>Gewerkte uren</label>
+                              <input
+                                type="number"
+                                step="0.5"
+                                min="0"
+                                value={completeHours}
+                                onChange={e => setCompleteHours(e.target.value)}
+                                placeholder="bijv. 8"
+                              />
+                            </div>
+                            <div className="complete-form-field">
+                              <label>Gereden kilometers</label>
+                              <input
+                                type="number"
+                                step="1"
+                                min="0"
+                                value={completeKm}
+                                onChange={e => setCompleteKm(e.target.value)}
+                                placeholder="bijv. 250"
+                              />
+                            </div>
+                          </div>
+                          <button
+                            className="btn-submit-complete"
+                            onClick={async () => {
+                              const hours = parseFloat(completeHours);
+                              const km = parseFloat(completeKm);
+                              if (isNaN(hours) || hours <= 0) {
+                                alert('Vul een geldig aantal uren in');
+                                return;
+                              }
+                              if (isNaN(km) || km < 0) {
+                                alert('Vul een geldig aantal kilometers in');
+                                return;
+                              }
+                              try {
+                                const { error } = await supabase
+                                  .from('routes')
+                                  .update({
+                                    route_status: 'completed',
+                                    hours_worked: hours,
+                                    actual_distance_km: km
+                                  })
+                                  .eq('id', route.id);
+
+                                if (error) throw error;
+
+                                setUnfinishedRoutes(prev => prev.filter(r => r.id !== route.id));
+                                setAllRoutes(prev => [...prev, { ...route, route_status: 'completed', hours_worked: hours, actual_distance_km: km }]);
+                                setRoutes(prev => [...prev, { ...route, route_status: 'completed', hours_worked: hours, actual_distance_km: km }]);
+                                setCompletingRoute(null);
+                                setCompleteHours('');
+                                setCompleteKm('');
+                                alert('Route succesvol afgerond!');
+                              } catch (err) {
+                                console.error('Error completing route:', err);
+                                alert('Fout bij het afronden: ' + err.message);
+                              }
+                            }}
+                          >
+                            ✅ Route afronden
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Stop overzicht */}
+                      {route.stops && route.stops.length > 0 && (
+                        <div className="unfinished-stops-list">
+                          {route.stops.map((stop, idx) => (
+                            <div key={idx} className="unfinished-stop-item">
+                              <span className="stop-number">{idx + 1}</span>
+                              <div className="stop-info">
+                                <span className="stop-name">{stop.name || `Stop ${idx + 1}`}</span>
+                                <span className="stop-address">{stop.address || '-'}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </>
         ) : (
