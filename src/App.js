@@ -587,7 +587,8 @@ function AppContent() {
     if (route) setRoute(null);
     
     // Verstuur webhook EERST (voordat auto-save kan falen)
-    if (removedStop?.phone) {
+    console.log('🗑️ Removing stop:', { id, removedStop, hasPhone: !!removedStop?.phone, phone: removedStop?.phone });
+    if (removedStop) {
       const routeDatum = selectedRouteDate
         ? new Date(selectedRouteDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
         : 'nog niet bepaald';
@@ -600,8 +601,10 @@ function AppContent() {
           profile: 'default'
         })
       })
-        .then(() => console.log('✅ Webhook sent for removed stop:', removedStop.name))
+        .then(res => console.log('✅ Webhook sent for removed stop:', removedStop.name, 'status:', res.status))
         .catch(err => console.error('❌ Error sending webhook for removed stop:', err));
+    } else {
+      console.warn('⚠️ Could not find stop with id:', id, 'in stops:', stops.map(s => ({ id: s.id, name: s.name })));
     }
 
     // Auto-save route after removing stop
