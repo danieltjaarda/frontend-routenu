@@ -782,7 +782,11 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, onReverseRoute, 
             onClick={() => setShowRouteModal(true)}
             disabled={isOptimizing}
           >
-            Route berekenen
+            {isOptimizing ? (
+              <><span className="spinner" /> Berekenen...</>
+            ) : (
+              'Route berekenen'
+            )}
           </button>
             {onReverseRoute && stops.length >= 2 && (
               <button 
