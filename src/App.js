@@ -456,26 +456,27 @@ function AppContent() {
           sendWelcomeEmail(newStop, routeNameForEmail, selectedRouteDate, currentRouteId);
         }
 
-        // Verstuur webhook ALTIJD bij het toevoegen van een stop (direct naar cloudflare)
-        try {
-          const routeDatum = selectedRouteDate 
-            ? new Date(selectedRouteDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
-            : 'nog niet bepaald';
-          await fetch('https://apihier.com/api/webhook/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              phone: newStop.phone || '',
-              message: `Beste klant, welkom bij Fatbikehulp! U bent aangemeld voor de route op ${routeDatum}. Bekijk deze pagina voor meer informatie: fatbikehulp.nl/informatie\n\nWilt u de tracking ontvangen? Vul dan dit formulier in: https://www.fatbikehulp.nl/klant-registratie\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`,
-              profile: 'default'
-            })
-          });
-          console.log('Webhook sent successfully for new stop');
-        } catch (webhookError) {
-          console.error('Error sending stop webhook:', webhookError);
-        }
       } catch (error) {
         console.error('Error saving order:', error);
+      }
+
+      // Verstuur webhook ALTIJD bij het toevoegen van een stop (onafhankelijk van opslaan)
+      try {
+        const routeDatum = selectedRouteDate 
+          ? new Date(selectedRouteDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+          : 'nog niet bepaald';
+        await fetch('https://apihier.com/api/webhook/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: newStop.phone || '',
+            message: `Beste klant, welkom bij Fatbikehulp! U bent aangemeld voor de route op ${routeDatum}. Bekijk deze pagina voor meer informatie: fatbikehulp.nl/informatie\n\nWilt u de tracking ontvangen? Vul dan dit formulier in: https://www.fatbikehulp.nl/klant-registratie\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`,
+            profile: 'default'
+          })
+        });
+        console.log('✅ Webhook sent successfully for new stop');
+      } catch (webhookError) {
+        console.error('❌ Error sending stop webhook:', webhookError);
       }
     } else {
       // Fallback: add to local state if not logged in
@@ -716,29 +717,41 @@ function AppContent() {
         ...stops.map(stop => ({ coordinates: stop.coordinates }))
       ];
 
-      console.log('Calling optimize-route API with', waypoints.length, 'waypoints');
+      console.log('Calling Mapbox Optimization API directly with', waypoints.length, 'waypoints');
 
-      // Call backend optimization endpoint (uses Mapbox Optimization API with secret token)
-      const response = await fetch(`${API_BASE_URL}/api/optimize-route`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ waypoints, profile: 'driving' })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || errorData.message || 'Route optimalisatie mislukt');
+      if (waypoints.length > 12) {
+        throw new Error('Maximum 12 waypoints ondersteund door Mapbox Optimization API');
       }
 
+      const coordinates = waypoints
+        .map(wp => `${wp.coordinates[0]},${wp.coordinates[1]}`)
+        .join(';');
+
+      const optimizeUrl = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving/${coordinates}?` +
+        `access_token=${MAPBOX_PUBLIC_TOKEN}&` +
+        `roundtrip=true&source=first&geometries=geojson&overview=full&steps=true&annotations=duration,distance`;
+
+      const response = await fetch(optimizeUrl);
       const data = await response.json();
-      
-      if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-        const routeData = data.routes[0];
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Route optimalisatie mislukt');
+      }
+
+      if (data.code === 'Ok' && data.trips && data.trips.length > 0) {
+        const trip = data.trips[0];
+        const optimizedWaypoints = (data.waypoints || []).map(wp => ({
+          location: wp.location,
+          coordinates: wp.location,
+          waypoint_index: wp.waypoint_index !== undefined ? wp.waypoint_index : -1,
+          name: wp.name || ''
+        }));
+
         const calculatedRoute = {
-          geometry: routeData.geometry,
-          distance: routeData.distance,
-          duration: routeData.duration,
-          waypoints: data.waypoints
+          geometry: trip.geometry,
+          distance: trip.distance,
+          duration: trip.duration,
+          waypoints: optimizedWaypoints
         };
 
         // Reorder stops based on optimized waypoint_index
