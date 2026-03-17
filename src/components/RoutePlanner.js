@@ -28,6 +28,7 @@ function RoutePlanner({
   onAddStop,
   stops,
   onRemoveStop,
+  onMoveStop,
   onCalculateRoute,
   onOptimizeRoute,
   onClearRoute,
@@ -273,13 +274,25 @@ function RoutePlanner({
                       </div>
                     )}
                   </div>
-                  <button
-                    className="remove-btn"
-                    onClick={() => onRemoveStop(stop.id)}
-                    title="Verwijder stop"
-                  >
-                    <CloseIcon />
-                  </button>
+                  <div style={{ display: 'flex', gap: '4px', flexDirection: 'column' }}>
+                    {onMoveStop && (
+                      <button
+                        className="move-btn"
+                        onClick={() => onMoveStop(stop.id)}
+                        title="Verplaats stop"
+                        style={{ background: '#0CC0DF', color: 'white', border: 'none', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' }}
+                      >
+                        ↗
+                      </button>
+                    )}
+                    <button
+                      className="remove-btn"
+                      onClick={() => onRemoveStop(stop.id)}
+                      title="Verwijder stop"
+                    >
+                      <CloseIcon />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

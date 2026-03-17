@@ -37,6 +37,7 @@ import {
   getEmailTemplate,
   sendWebhook
 } from './services/userData';
+import { supabase } from './lib/supabase';
 import './App.css';
 
 // Public token voor Mapbox GL JS (kaart) - stel in via REACT_APP_MAPBOX_PUBLIC_TOKEN in .env
@@ -68,6 +69,10 @@ function AppContent() {
   const [showRouteChoiceModal, setShowRouteChoiceModal] = useState(false);
   const [pendingDate, setPendingDate] = useState(null);
   const [existingRoutesForDate, setExistingRoutesForDate] = useState([]);
+  const [showMoveStopModal, setShowMoveStopModal] = useState(false);
+  const [movingStop, setMovingStop] = useState(null);
+  const [availableRoutes, setAvailableRoutes] = useState([]);
+  const [movingInProgress, setMovingInProgress] = useState(false);
   const hasRedirectedRef = useRef(false);
 
   // Redirect to /vandaag on page load/refresh (for authenticated non-driver users)
@@ -615,6 +620,136 @@ function AppContent() {
     }
   };
 
+  const handleOpenMoveStop = async (stopId) => {
+    const stop = stops.find(s => s.id === stopId);
+    if (!stop || !currentUser) return;
+    setMovingStop(stop);
+
+    try {
+      const { data, error } = await supabase
+        .from('routes')
+        .select('id, name, date, stops, route_status')
+        .eq('user_id', currentUser.id)
+        .in('route_status', ['planned', 'started'])
+        .neq('id', currentRouteId)
+        .order('date', { ascending: true });
+
+      if (!error) {
+        setAvailableRoutes(data || []);
+      }
+    } catch (err) {
+      console.error('Error loading routes for move:', err);
+    }
+    setShowMoveStopModal(true);
+  };
+
+  const handleMoveStopToRoute = async (targetRouteId, targetRouteName) => {
+    if (!movingStop || !currentUser) return;
+    setMovingInProgress(true);
+
+    try {
+      const { data: targetRoute, error: fetchError } = await supabase
+        .from('routes')
+        .select('stops, date')
+        .eq('id', targetRouteId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const targetStops = targetRoute.stops || [];
+      targetStops.push(movingStop);
+
+      const { error: updateTargetError } = await supabase
+        .from('routes')
+        .update({ stops: targetStops })
+        .eq('id', targetRouteId);
+
+      if (updateTargetError) throw updateTargetError;
+
+      const updatedStops = stops.filter(s => s.id !== movingStop.id);
+      setStops(updatedStops);
+      if (route) setRoute(null);
+      await autoSaveRoute(updatedStops, null);
+
+      const targetDatum = targetRoute.date
+        ? new Date(targetRoute.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+        : 'een andere datum';
+
+      if (movingStop.phone) {
+        fetch('https://apihier.com/api/webhook/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: movingStop.phone || '',
+            message: `Beste klant, uw afspraak is verplaatst naar de route op ${targetDatum}. U ontvangt op de dag zelf verdere informatie over de verwachte aankomsttijd.\n\nHeeft u hier vragen over? Neem dan contact op met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`,
+            profile: 'default'
+          })
+        })
+          .then(() => console.log('✅ Webhook sent for moved stop:', movingStop.name))
+          .catch(err => console.error('❌ Error sending webhook for moved stop:', err));
+      }
+
+      setShowMoveStopModal(false);
+      setMovingStop(null);
+      alert(`Stop "${movingStop.name}" is verplaatst naar ${targetRouteName}`);
+    } catch (err) {
+      console.error('Error moving stop:', err);
+      alert('Fout bij het verplaatsen: ' + err.message);
+    } finally {
+      setMovingInProgress(false);
+    }
+  };
+
+  const handleMoveStopToNewRoute = async (date) => {
+    if (!movingStop || !currentUser) return;
+    setMovingInProgress(true);
+
+    try {
+      const dateStr = date instanceof Date
+        ? date.toISOString().split('T')[0]
+        : date;
+      const dateFormatted = new Date(dateStr).toLocaleDateString('nl-NL');
+
+      const newRouteId = await saveRoute(currentUser.id, {
+        date: dateStr,
+        name: `Route ${dateFormatted}`,
+        stops: [movingStop],
+        route_data: null,
+        selected_driver: null
+      });
+
+      const updatedStops = stops.filter(s => s.id !== movingStop.id);
+      setStops(updatedStops);
+      if (route) setRoute(null);
+      await autoSaveRoute(updatedStops, null);
+
+      const targetDatum = new Date(dateStr).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
+
+      if (movingStop.phone) {
+        fetch('https://apihier.com/api/webhook/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: movingStop.phone || '',
+            message: `Beste klant, uw afspraak is verplaatst naar de route op ${targetDatum}. U ontvangt op de dag zelf verdere informatie over de verwachte aankomsttijd.\n\nHeeft u hier vragen over? Neem dan contact op met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`,
+            profile: 'default'
+          })
+        })
+          .then(() => console.log('✅ Webhook sent for moved stop:', movingStop.name))
+          .catch(err => console.error('❌ Error sending webhook for moved stop:', err));
+      }
+
+      setShowMoveStopModal(false);
+      setMovingStop(null);
+      alert(`Stop "${movingStop.name}" is verplaatst naar nieuwe route op ${dateFormatted}`);
+    } catch (err) {
+      console.error('Error moving stop to new route:', err);
+      alert('Fout bij het verplaatsen: ' + err.message);
+    } finally {
+      setMovingInProgress(false);
+    }
+  };
+
   // Reorder stops (move from oldIndex to newIndex)
   const handleReorderStops = async (oldIndex, newIndex) => {
     const updatedStops = [...stops];
@@ -1143,6 +1278,7 @@ function AppContent() {
                         onAddStop={handleAddStop}
                         stops={stops}
                         onRemoveStop={handleRemoveStop}
+                        onMoveStop={handleOpenMoveStop}
                         onOptimizeRoute={handleOptimizeRoute}
                         onClearRoute={handleClearRoute}
                         isOptimizing={isOptimizing}
@@ -1271,6 +1407,70 @@ function AppContent() {
                 >
                   <span className="plus-icon">+</span>
                   Nieuwe route aanmaken
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Move Stop Modal */}
+      {showMoveStopModal && movingStop && (
+        <div className="route-choice-overlay" onClick={() => { setShowMoveStopModal(false); setMovingStop(null); }}>
+          <div className="route-choice-modal" onClick={e => e.stopPropagation()}>
+            <div className="route-choice-header">
+              <h2>Stop verplaatsen</h2>
+              <button className="close-button" onClick={() => { setShowMoveStopModal(false); setMovingStop(null); }}>×</button>
+            </div>
+            <div className="route-choice-content">
+              <p style={{ margin: '0 0 8px', fontSize: '14px', color: '#6d7175' }}>
+                Verplaats <strong>{movingStop.name}</strong> naar:
+              </p>
+
+              {availableRoutes.length > 0 && (
+                <div className="existing-routes-list">
+                  <h3 style={{ fontSize: '14px', margin: '12px 0 8px', color: '#1a1a1a' }}>Bestaande routes:</h3>
+                  {availableRoutes.map(r => {
+                    const routeDate = r.date ? new Date(r.date).toLocaleDateString('nl-NL') : '-';
+                    return (
+                      <button
+                        key={r.id}
+                        className="route-choice-item"
+                        onClick={() => handleMoveStopToRoute(r.id, r.name || `Route ${routeDate}`)}
+                        disabled={movingInProgress}
+                      >
+                        <span className="route-number">{(r.stops?.length || 0)}</span>
+                        <div className="route-info">
+                          <div className="route-name">{r.name || 'Route zonder naam'}</div>
+                          <div className="route-details">{routeDate} • {r.stops?.length || 0} stops</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="route-choice-actions" style={{ marginTop: '16px' }}>
+                <h3 style={{ fontSize: '14px', margin: '0 0 8px', color: '#1a1a1a' }}>Nieuwe route aanmaken:</h3>
+                <input
+                  type="date"
+                  id="move-stop-date"
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #c9cccf', borderRadius: '8px', fontSize: '14px', marginBottom: '8px', boxSizing: 'border-box' }}
+                />
+                <button
+                  className="btn-new-route-choice"
+                  onClick={() => {
+                    const dateInput = document.getElementById('move-stop-date');
+                    if (!dateInput?.value) {
+                      alert('Selecteer een datum voor de nieuwe route');
+                      return;
+                    }
+                    handleMoveStopToNewRoute(dateInput.value);
+                  }}
+                  disabled={movingInProgress}
+                >
+                  <span className="plus-icon">+</span>
+                  {movingInProgress ? 'Verplaatsen...' : 'Nieuwe route aanmaken'}
                 </button>
               </div>
             </div>
