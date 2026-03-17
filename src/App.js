@@ -586,28 +586,29 @@ function AppContent() {
     setStops(updatedStops);
     if (route) setRoute(null);
     
-    // Auto-save route after removing stop
-    await autoSaveRoute(updatedStops, null);
-
-    // Verstuur webhook als de verwijderde stop een telefoonnummer heeft
+    // Verstuur webhook EERST (voordat auto-save kan falen)
     if (removedStop?.phone) {
-      try {
-        const routeDatum = selectedRouteDate
-          ? new Date(selectedRouteDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
-          : 'nog niet bepaald';
-        await fetch('https://apihier.com/api/webhook/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: removedStop.phone || '',
-            message: `Beste klant, wij willen u laten weten dat uw afspraak voor de route op ${routeDatum} is komen te vervallen. Onze excuses voor het ongemak.\n\nHeeft u hier vragen over? Neem dan contact op met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`,
-            profile: 'default'
-          })
-        });
-        console.log('✅ Webhook sent for removed stop:', removedStop.name);
-      } catch (err) {
-        console.error('❌ Error sending webhook for removed stop:', err);
-      }
+      const routeDatum = selectedRouteDate
+        ? new Date(selectedRouteDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+        : 'nog niet bepaald';
+      fetch('https://apihier.com/api/webhook/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: removedStop.phone || '',
+          message: `Beste klant, wij willen u laten weten dat uw afspraak voor de route op ${routeDatum} is komen te vervallen. Onze excuses voor het ongemak.\n\nHeeft u hier vragen over? Neem dan contact op met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`,
+          profile: 'default'
+        })
+      })
+        .then(() => console.log('✅ Webhook sent for removed stop:', removedStop.name))
+        .catch(err => console.error('❌ Error sending webhook for removed stop:', err));
+    }
+
+    // Auto-save route after removing stop
+    try {
+      await autoSaveRoute(updatedStops, null);
+    } catch (err) {
+      console.error('Error auto-saving route after remove:', err);
     }
   };
 
