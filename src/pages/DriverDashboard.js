@@ -12,7 +12,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 
 
 // Functie om review webhook te versturen
 const sendReviewSMS = async (toPhoneNumber) => {
-  const response = await fetch('https://editorial-neighbors-periodic-angel.trycloudflare.com/api/webhook', {
+  const response = await fetch('https://apihier.com/api/webhook/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -298,7 +298,7 @@ function DriverDashboard() {
           : `${FRONTEND_BASE_URL}/route/${routeId}/${liveRouteToken}`;
 
         try {
-          await fetch('https://editorial-neighbors-periodic-angel.trycloudflare.com/api/webhook', {
+          await fetch('https://apihier.com/api/webhook/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1705,7 +1705,7 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
           ? `${FRONTEND_BASE_URL}/route/${route.id}/${route.live_route_token}`
           : `${FRONTEND_BASE_URL}/route/${route.id}`;
 
-      await fetch('https://editorial-neighbors-periodic-angel.trycloudflare.com/api/webhook', {
+      await fetch('https://apihier.com/api/webhook/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

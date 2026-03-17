@@ -461,7 +461,7 @@ function AppContent() {
           const routeDatum = selectedRouteDate 
             ? new Date(selectedRouteDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
             : 'nog niet bepaald';
-          await fetch('https://editorial-neighbors-periodic-angel.trycloudflare.com/api/webhook', {
+          await fetch('https://apihier.com/api/webhook/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

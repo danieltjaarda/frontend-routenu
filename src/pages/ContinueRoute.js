@@ -7,7 +7,7 @@ import './DriverDashboard.css';
 
 // Functie om review webhook te versturen
 const sendReviewSMS = async (toPhoneNumber) => {
-  const response = await fetch('https://editorial-neighbors-periodic-angel.trycloudflare.com/api/webhook', {
+  const response = await fetch('https://apihier.com/api/webhook/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
