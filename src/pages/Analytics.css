@@ -1531,19 +1531,22 @@
   }
 
   .stats-row {
+    flex-direction: column;
     gap: 8px;
   }
 
   .stat-item {
-    min-width: 0;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
   }
 
   .stat-label {
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .stat-value {
-    font-size: 12px;
+    font-size: 14px;
   }
 
   .details-grid {
