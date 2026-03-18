@@ -1144,7 +1144,6 @@ function DriverDashboard() {
                         className="btn-overview"
                         onClick={async () => {
                           setActiveRoute(route);
-                          // Load timestamps for route overview
                           try {
                             const timestamps = await getRouteStopTimestamps(route.id);
                             setRouteTimestamps(timestamps || []);
@@ -1166,6 +1165,41 @@ function DriverDashboard() {
                       >
                         Route voortzetten
                       </button>
+                      {route.live_route_token && (
+                        <button
+                          className="btn-send-tracking"
+                          onClick={async () => {
+                            const routeDatum = route.date
+                              ? new Date(route.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+                              : 'vandaag';
+                            let sent = 0;
+                            let failed = 0;
+                            for (const stop of (route.stops || [])) {
+                              const encodedEmail = stop.email ? encodeURIComponent(stop.email.trim().toLowerCase()) : null;
+                              const personalLink = encodedEmail
+                                ? `${FRONTEND_BASE_URL}/route/${route.id}/${route.live_route_token}/${encodedEmail}`
+                                : `${FRONTEND_BASE_URL}/route/${route.id}/${route.live_route_token}`;
+                              try {
+                                await fetch('https://apihier.com/api/webhook/', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    phone: stop.phone || '',
+                                    message: `Goedemorgen! De route van ${routeDatum} is gestart. U kunt de live tracking volgen via deze link: ${personalLink}\n\nU wordt ook ruim 1 uur van tevoren gebeld.\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`,
+                                    profile: 'default'
+                                  })
+                                });
+                                sent++;
+                              } catch (err) {
+                                failed++;
+                              }
+                            }
+                            alert(`Tracking verstuurd naar ${sent} klant(en)${failed > 0 ? `, ${failed} mislukt` : ''}`);
+                          }}
+                        >
+                          📍 Tracking versturen
+                        </button>
+                      )}
                     </div>
                     {/* Timeline */}
                     {route.stops && route.stops.length > 0 && (
