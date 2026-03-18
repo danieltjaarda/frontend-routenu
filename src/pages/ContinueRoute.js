@@ -38,7 +38,10 @@ function ContinueRoute() {
   const [partsCost, setPartsCost] = useState('');
   const [routeTimestamps, setRouteTimestamps] = useState([]);
   const [reviewSending, setReviewSending] = useState(false);
-  const [reviewSent, setReviewSent] = useState({});  // track per stop index
+  const [reviewSent, setReviewSent] = useState({});
+  const [hoursWorked, setHoursWorked] = useState('');
+  const [kilometersDriven, setKilometersDriven] = useState('');
+  const [isCompletingRoute, setIsCompletingRoute] = useState(false);
 
   const handleSendReview = async (phone, stopIndex) => {
     if (!phone) return;
@@ -225,9 +228,8 @@ function ContinueRoute() {
           setPartsCost('');
         }
       } else {
-        // All stops completed, navigate back
-        alert('Alle stops zijn voltooid!');
-        navigate('/monteur');
+        // All stops completed, show complete route form
+        setCurrentStopIndex(nextIndex);
       }
     } catch (error) {
       console.error('Error saving stop details:', error);
@@ -415,8 +417,82 @@ function ContinueRoute() {
       {allCompleted && (
         <div className="all-completed-message">
           <h2>✓ Alle stops zijn voltooid!</h2>
-          <button onClick={() => navigate('/monteur')} className="btn-submit">
-            Terug naar overzicht
+          <p style={{ color: '#6d7175', marginBottom: '20px' }}>Vul de gewerkte uren en gereden kilometers in om de route af te ronden.</p>
+          
+          <div className="complete-route-form" style={{ maxWidth: '400px', margin: '0 auto' }}>
+            <div className="form-group">
+              <label htmlFor="hours-worked">Gewerkte uren *</label>
+              <input
+                type="number"
+                id="hours-worked"
+                step="0.5"
+                min="0"
+                value={hoursWorked}
+                onChange={e => setHoursWorked(e.target.value)}
+                placeholder="bijv. 8"
+                style={{ width: '100%', padding: '12px', border: '1px solid #c9cccf', borderRadius: '12px', fontSize: '16px', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="km-driven">Gereden kilometers *</label>
+              <input
+                type="number"
+                id="km-driven"
+                step="1"
+                min="0"
+                value={kilometersDriven}
+                onChange={e => setKilometersDriven(e.target.value)}
+                placeholder="bijv. 250"
+                style={{ width: '100%', padding: '12px', border: '1px solid #c9cccf', borderRadius: '12px', fontSize: '16px', boxSizing: 'border-box' }}
+              />
+            </div>
+            <button 
+              className="btn-submit"
+              disabled={isCompletingRoute}
+              onClick={async () => {
+                const hours = parseFloat(hoursWorked);
+                const km = parseFloat(kilometersDriven);
+                if (isNaN(hours) || hours <= 0) {
+                  alert('Vul een geldig aantal uren in');
+                  return;
+                }
+                if (isNaN(km) || km < 0) {
+                  alert('Vul een geldig aantal kilometers in');
+                  return;
+                }
+                setIsCompletingRoute(true);
+                try {
+                  const { error } = await supabase
+                    .from('routes')
+                    .update({
+                      route_status: 'completed',
+                      hours_worked: hours,
+                      actual_distance_km: km
+                    })
+                    .eq('id', routeId);
+
+                  if (error) throw error;
+                  alert('Route succesvol afgerond!');
+                  navigate('/monteur');
+                } catch (err) {
+                  console.error('Error completing route:', err);
+                  alert('Fout bij het afronden: ' + err.message);
+                } finally {
+                  setIsCompletingRoute(false);
+                }
+              }}
+              style={{ width: '100%', marginTop: '8px' }}
+            >
+              {isCompletingRoute ? '⏳ Afronden...' : '✅ Route afronden'}
+            </button>
+          </div>
+          
+          <button 
+            onClick={() => navigate('/monteur')} 
+            className="btn-cancel"
+            style={{ marginTop: '12px' }}
+          >
+            Terug zonder afronden
           </button>
         </div>
       )}
