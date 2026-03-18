@@ -1,0 +1,7 @@
+[     649ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://jmdgowgmgztuhtxrujsc.supabase.co/auth/v1/token?grant_type=refresh_token:0
+[     651ms] [ERROR] AuthApiError: Invalid Refresh Token: Refresh Token Not Found
+    at handleError (http://localhost:8080/static/js/bundle.js:5276:9)
+    at async _handleRequest (http://localhost:8080/static/js/bundle.js:5326:5)
+    at async _request (http://localhost:8080/static/js/bundle.js:5306:16)
+    at async http://localhost:8080/static/js/bundle.js:3344:16
+    at async http://localhost:8080/static/js/bundle.js:5624:26 @ http://localhost:8080/static/js/bundle.js:3449

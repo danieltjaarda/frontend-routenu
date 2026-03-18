@@ -210,53 +210,86 @@ function Sidebar({ onNavigate, currentView }) {
     { id: 'bike', icon: BikeIcon, label: 'Nieuwe', tooltip: 'Opgehaalde fietsen', view: 'pickedUpBikes', path: '/opgehaalde-fietsen' },
   ];
 
-  // Don't show sidebar for drivers
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
   if (isDriver) {
     return null;
   }
 
-  return (
-    <div className="sidebar-menu">
-      <div className="menu-items">
-        {menuItems.map((item) => {
-          const IconComponent = item.icon;
-          return (
-            <button
-              key={item.id}
-              className={`menu-item ${activeItem === item.id ? 'active' : ''}`}
-              onClick={() => {
-                setActiveItem(item.id);
-                if (item.path) {
-                  navigate(item.path);
-                } else if (item.view && onNavigate) {
-                  onNavigate(item.view);
-                }
-              }}
-            >
-          <span className="menu-icon">
-            <IconComponent />
-          </span>
-          <span className="menu-tooltip">{item.tooltip || item.label}</span>
-            </button>
-          );
-        })}
-      </div>
+  const handleItemClick = (item) => {
+    setActiveItem(item.id);
+    setMobileOpen(false);
+    if (item.path) {
+      navigate(item.path);
+    } else if (item.view && onNavigate) {
+      onNavigate(item.view);
+    }
+  };
 
-      <div className="menu-user">
-        <button 
-          className="user-button" 
-          onClick={() => {
-            navigate('/profiel');
-            setActiveItem('profile');
-          }}
-        >
-          <span className="user-icon">
-            <UserIcon />
-          </span>
-          <span className="menu-tooltip">Profiel</span>
-        </button>
+  return (
+    <>
+      <button className="mobile-menu-toggle" onClick={() => setMobileOpen(!mobileOpen)}>
+        {mobileOpen ? (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        ) : (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        )}
+      </button>
+
+      {mobileOpen && <div className="mobile-menu-overlay" onClick={() => setMobileOpen(false)} />}
+
+      <div className={`sidebar-menu ${mobileOpen ? 'mobile-open' : ''}`}>
+        <div className="mobile-menu-header">
+          <img src="/logo.png" alt="RouteNu" style={{ height: '28px' }} />
+        </div>
+        <div className="menu-items">
+          {menuItems.map((item) => {
+            const IconComponent = item.icon;
+            return (
+              <button
+                key={item.id}
+                className={`menu-item ${activeItem === item.id ? 'active' : ''}`}
+                onClick={() => handleItemClick(item)}
+              >
+                <span className="menu-icon">
+                  <IconComponent />
+                </span>
+                <span className="menu-label">{item.tooltip || item.label}</span>
+                <span className="menu-tooltip">{item.tooltip || item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="menu-user">
+          <button 
+            className="user-button" 
+            onClick={() => {
+              navigate('/profiel');
+              setActiveItem('profile');
+              setMobileOpen(false);
+            }}
+          >
+            <span className="user-icon">
+              <UserIcon />
+            </span>
+            <span className="menu-label">Profiel</span>
+            <span className="menu-tooltip">Profiel</span>
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
