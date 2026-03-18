@@ -220,8 +220,7 @@ function Routes({ onSelectRoute }) {
         cumulativeDuration += segmentDuration;
         
         const arrivalTime = new Date(startTime.getTime() + (cumulativeDuration * 1000));
-        // Use service time from user profile, or from route_data, or default 5 minutes
-        const serviceTimeMinutes = userServiceTime || route.route_data?.service_time || 5;
+        const serviceTimeMinutes = userServiceTime || route.route_data?.service_time || 90;
         const departureTime = new Date(arrivalTime.getTime() + (serviceTimeMinutes * 60 * 1000));
         
         times.push({
@@ -238,8 +237,7 @@ function Routes({ onSelectRoute }) {
         currentTime = new Date(currentTime.getTime() + (segmentDuration * 1000));
         
         const arrivalTime = new Date(currentTime);
-        // Use service time from user profile, or from route_data, or default 5 minutes
-        const serviceTimeMinutes = userServiceTime || route.route_data?.service_time || 5;
+        const serviceTimeMinutes = userServiceTime || route.route_data?.service_time || 90;
         const departureTime = new Date(arrivalTime.getTime() + (serviceTimeMinutes * 60 * 1000));
         
         times.push({

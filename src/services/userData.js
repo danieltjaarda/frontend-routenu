@@ -698,8 +698,7 @@ export const recalculateArrivalTimes = async (routeId, routeData, actualTimestam
       if (timestamp && timestamp.actual_arrival_time) {
         // Use actual arrival time
         const arrivalTime = new Date(timestamp.actual_arrival_time);
-        // Use service time from user profile (if provided), otherwise from route_data, or default 5 minutes
-        const serviceTimeMinutes = userServiceTime || routeData.route_data?.service_time || 5;
+        const serviceTimeMinutes = userServiceTime || routeData.route_data?.service_time || 90;
         const departureTime = timestamp.actual_departure_time 
           ? new Date(timestamp.actual_departure_time)
           : new Date(arrivalTime.getTime() + (serviceTimeMinutes * 60 * 1000));
@@ -736,8 +735,7 @@ export const recalculateArrivalTimes = async (routeId, routeData, actualTimestam
           }
         }
         
-        // Use service time from user profile (if provided), otherwise from route_data, or default 5 minutes
-        const serviceTimeMinutes = userServiceTime || routeData.route_data?.service_time || 5;
+        const serviceTimeMinutes = userServiceTime || routeData.route_data?.service_time || 90;
         const estimatedDeparture = new Date(estimatedArrival.getTime() + (serviceTimeMinutes * 60 * 1000));
         
         recalculatedTimes.push({
@@ -785,8 +783,7 @@ const calculateOriginalArrivalTimes = (routeData, routeStartTime = null, userSer
       cumulativeDuration += segmentDuration;
       
       const arrivalTime = new Date(startTime.getTime() + (cumulativeDuration * 1000));
-      // Use service time from user profile (if provided), otherwise from route_data, or default 5 minutes
-      const serviceTimeMinutes = userServiceTime || routeData.route_data?.service_time || 5;
+      const serviceTimeMinutes = userServiceTime || routeData.route_data?.service_time || 90;
       const departureTime = new Date(arrivalTime.getTime() + (serviceTimeMinutes * 60 * 1000));
       
       times.push({

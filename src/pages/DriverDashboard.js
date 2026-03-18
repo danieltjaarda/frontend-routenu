@@ -1881,8 +1881,7 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
 
     const arrivalTime = new Date(startTime.getTime() + (cumulativeDuration * 1000));
     
-    // Get service time (from route_data or default 5 minutes)
-    const serviceTimeMinutes = route.route_data?.service_time || 5;
+    const serviceTimeMinutes = route.route_data?.service_time || 90;
     const departureTime = new Date(arrivalTime.getTime() + (serviceTimeMinutes * 60 * 1000));
 
     return {

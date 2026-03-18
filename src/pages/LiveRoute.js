@@ -301,8 +301,7 @@ function LiveRoute() {
       } else if (timestamp && timestamp.actual_arrival_time) {
         // If only arrival time exists, use arrival + service time as departure
         lastCompletedIndex = i;
-        // Use service time from user profile (if available), otherwise from route_data, or default 5 minutes
-        const serviceTimeMinutes = userServiceTime || routeData.route_data?.service_time || 5;
+        const serviceTimeMinutes = userServiceTime || routeData.route_data?.service_time || 90;
         lastDepartureTime = new Date(new Date(timestamp.actual_arrival_time).getTime() + (serviceTimeMinutes * 60 * 1000));
         console.log(`Found last completed stop (arrival only): ${i}, estimated departure at:`, lastDepartureTime);
         break;
@@ -363,8 +362,7 @@ function LiveRoute() {
 
       // Calculate estimated arrival and departure time
       const estimatedArrival = new Date(lastDepartureTime.getTime() + (cumulativeDuration * 1000));
-      // Use service time from user profile (if available), otherwise from route_data, or default 5 minutes
-      const serviceTimeMinutes = userServiceTime || routeData.route_data?.service_time || 5;
+      const serviceTimeMinutes = userServiceTime || routeData.route_data?.service_time || 90;
       const estimatedDeparture = new Date(estimatedArrival.getTime() + (serviceTimeMinutes * 60 * 1000));
       
       console.log(`Stop ${stopIndex}: segment=${Math.round(segmentDuration)}s, cumulative=${Math.round(cumulativeDuration)}s, arrival=${estimatedArrival.toLocaleTimeString()}, serviceTime=${serviceTimeMinutes}min`);
@@ -533,14 +531,14 @@ function LiveRoute() {
                       </div>
                     )}
                     
-                    {/* Show estimated arrival time if not yet arrived */}
+                    {/* Show estimated arrival time range if not yet arrived */}
                     {!timestamp?.actual_arrival_time && recalculatedTime && (
                       <div className="time-info estimated-arrival">
                         <div className="estimated-time-content">
                           <span className="time-label">Verwachte aankomsttijd</span>
                           <div className="estimated-time-display">
                             <span className="time-value estimated">
-                              {recalculatedTime.arrival}
+                              {recalculatedTime.arrival} - {recalculatedTime.departure}
                             </span>
                             {recalculatedTime.estimatedMinutes > 0 && (
                               <span className="time-note">Over ongeveer {recalculatedTime.estimatedMinutes} minuten</span>

@@ -108,8 +108,7 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, onReverseRoute, 
         cumulativeDuration += segmentDuration;
         
         const arrivalTime = new Date(startTime.getTime() + (cumulativeDuration * 1000));
-        // Gebruik algemene service tijd voor alle stops
-        const serviceTimeMinutes = serviceTime || 5;
+        const serviceTimeMinutes = serviceTime || 90;
         const departureTime = new Date(arrivalTime.getTime() + (serviceTimeMinutes * 60 * 1000));
         
         times.push({
@@ -130,8 +129,7 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, onReverseRoute, 
       
       stops.forEach((stop, index) => {
         const arrivalTime = new Date(startTime.getTime() + (durationPerStop * (index + 1) * 1000));
-        // Gebruik service tijd uit user profile (via prop)
-        const serviceTimeMinutes = serviceTime || 5;
+        const serviceTimeMinutes = serviceTime || 90;
         const departureTime = new Date(arrivalTime.getTime() + (serviceTimeMinutes * 60 * 1000));
         
         times.push({
