@@ -492,37 +492,12 @@ function Routes({ onSelectRoute }) {
     
     switch (filterStatus) {
       case 'Huidige routes':
-        // Show routes with today's date or future dates
-        const filtered = routes.filter(route => {
-          if (!route.date) {
-            console.log('Route has no date:', route.id, route.name);
-            return false;
-          }
-          
-          // Get route date as YYYY-MM-DD string (local time)
+        return routes.filter(route => {
+          if (!route.date) return false;
           const routeDateStr = getLocalDateString(route.date);
-          if (!routeDateStr) {
-            return false;
-          }
-          
-          // Compare as strings (YYYY-MM-DD format allows string comparison)
-          // Include routes from today (>=) and all future dates
-          const isIncluded = routeDateStr >= todayStr;
-          console.log('Filtering route:', {
-            routeName: route.name,
-            routeDate: route.date,
-            routeDateStr,
-            todayStr,
-            isIncluded
-          });
-          return isIncluded;
+          if (!routeDateStr) return false;
+          return routeDateStr >= todayStr;
         });
-        console.log('Huidige routes filter result:', {
-          totalRoutes: routes.length,
-          filteredCount: filtered.length,
-          todayStr
-        });
-        return filtered;
       
       case 'Voltooide routes':
         // Only show completed routes
@@ -536,6 +511,33 @@ function Routes({ onSelectRoute }) {
         return routes;
     }
   }, [routes, filterStatus]);
+
+  // Pre-compute route counts and numbers per date (avoids O(n²) in render loop)
+  const routeDateMap = React.useMemo(() => {
+    const map = new Map();
+    for (const r of routes) {
+      if (!r.date) continue;
+      const dateStr = new Date(r.date).toISOString().split('T')[0];
+      if (!map.has(dateStr)) map.set(dateStr, []);
+      map.get(dateStr).push(r);
+    }
+    // Sort each group by created_at once
+    for (const [, group] of map) {
+      group.sort((a, b) => {
+        const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return aTime - bTime;
+      });
+    }
+    return map;
+  }, [routes]);
+
+  // Pre-compute today string for row rendering
+  const todayMs = React.useMemo(() => {
+    const t = new Date();
+    t.setHours(0, 0, 0, 0);
+    return t.getTime();
+  }, []);
 
   return (
     <div className="routes-page">
@@ -587,33 +589,15 @@ function Routes({ onSelectRoute }) {
                   ? `${Math.round(route.route_data.duration / 60)} min` 
                   : '-';
                 
-                // Check if route date is today
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
                 const routeDateObj = route.date ? new Date(route.date) : null;
-                if (routeDateObj) {
-                  routeDateObj.setHours(0, 0, 0, 0);
-                }
-                const isToday = routeDateObj && routeDateObj.getTime() === today.getTime();
+                if (routeDateObj) routeDateObj.setHours(0, 0, 0, 0);
+                const isToday = routeDateObj && routeDateObj.getTime() === todayMs;
                 const isCompleted = route.route_status === 'completed';
 
-                // Count routes on the same date and get index (from all routes, not just filtered)
                 const routeDateStr = route.date ? new Date(route.date).toISOString().split('T')[0] : null;
-                const routesOnSameDate = routes.filter(r => {
-                  if (!r.date) return false;
-                  const rDateStr = new Date(r.date).toISOString().split('T')[0];
-                  return rDateStr === routeDateStr;
-                });
-                
-                // Get the index of this route among routes on the same date (sorted by created_at)
-                const sortedRoutesOnSameDate = routesOnSameDate.sort((a, b) => {
-                  const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
-                  const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
-                  return aTime - bTime;
-                });
-                const routeIndex = sortedRoutesOnSameDate.findIndex(r => r.id === route.id);
-                const routeNumber = routeIndex >= 0 ? routeIndex + 1 : 1;
-                const showNumber = routesOnSameDate.length > 1;
+                const sameDateGroup = routeDateStr ? routeDateMap.get(routeDateStr) : null;
+                const showNumber = sameDateGroup && sameDateGroup.length > 1;
+                const routeNumber = showNumber ? sameDateGroup.findIndex(r => r.id === route.id) + 1 : 1;
 
                 const routeDate = route.date 
                   ? `${new Date(route.date).toLocaleDateString('nl-NL')}${showNumber ? ` (${routeNumber})` : ''}`

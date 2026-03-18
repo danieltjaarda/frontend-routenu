@@ -40,13 +40,15 @@ export const saveRoute = async (userId, routeData) => {
   }
 };
 
-// Get all routes for user
+// Get all routes for user (lightweight - for overview/list pages)
 export const getUserRoutes = async (userId) => {
   try {
     const { data, error } = await supabase
       .from('routes')
       .select(`
-        *,
+        id, name, date, route_status, selected_driver, driver_id, created_at, updated_at,
+        stops,
+        route_data,
         drivers (
           id,
           name,
@@ -58,7 +60,6 @@ export const getUserRoutes = async (userId) => {
 
     if (error) throw error;
     
-    // Map the data to include driver name from the join
     const routesWithDriverName = (data || []).map(route => ({
       ...route,
       driver_name: route.drivers?.name || route.selected_driver || null
@@ -71,7 +72,7 @@ export const getUserRoutes = async (userId) => {
   }
 };
 
-// Get route for specific date
+// Get route for specific date (single - legacy, returns first match)
 export const getRouteByDate = async (userId, date) => {
   try {
     const dateStr = date instanceof Date 
@@ -90,6 +91,28 @@ export const getRouteByDate = async (userId, date) => {
     return data || null;
   } catch (error) {
     console.error('Error getting route by date:', error);
+    throw error;
+  }
+};
+
+// Get all routes for a specific date (returns array)
+export const getRoutesByDate = async (userId, date) => {
+  try {
+    const dateStr = date instanceof Date 
+      ? date.toISOString().split('T')[0] 
+      : new Date(date).toISOString().split('T')[0];
+    
+    const { data, error } = await supabase
+      .from('routes')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('date', dateStr)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error getting routes by date:', error);
     throw error;
   }
 };
@@ -327,9 +350,6 @@ export const getUserProfile = async (userId) => {
 // Save driver
 export const saveDriver = async (adminUserId, driverUserId, driverData) => {
   try {
-    console.log('Saving driver with adminUserId:', adminUserId, 'driverUserId:', driverUserId, 'driverData:', driverData);
-    
-    // First check if drivers table exists and is accessible
     const { data: existingDriver, error: checkError } = await supabase
       .from('drivers')
       .select('id')
@@ -366,14 +386,12 @@ export const saveDriver = async (adminUserId, driverUserId, driverData) => {
       .single();
 
     if (error) {
-      console.error('Supabase error saving driver:', error);
       if (error.code === '42501' || error.message.includes('permission') || error.message.includes('policy')) {
         throw new Error('Geen toegang om driver op te slaan. Controleer de RLS policies. Voer driver-setup.sql uit in Supabase.');
       }
       throw error;
     }
     
-    console.log('Driver saved successfully:', data);
     return data;
   } catch (error) {
     console.error('Error saving driver:', error);
@@ -494,18 +512,6 @@ export const assignRouteToDriver = async (routeId, driverId) => {
 // Save email template
 export const saveEmailTemplate = async (userId, templateData) => {
   try {
-    console.log('💾 Saving email template to Supabase:', {
-      userId,
-      templateType: templateData.template_type,
-      htmlContentLength: templateData.html_content?.length,
-      htmlContentType: typeof templateData.html_content,
-      webhook_url: templateData.webhook_url,
-      webhook_urlType: typeof templateData.webhook_url,
-      webhook_urlLength: templateData.webhook_url?.length,
-      webhook_urlTrimmed: templateData.webhook_url?.trim(),
-      hasWebhookUrl: !!(templateData.webhook_url && templateData.webhook_url.trim())
-    });
-    
     const { data, error } = await supabase
       .from('email_templates')
       .upsert({
@@ -522,22 +528,7 @@ export const saveEmailTemplate = async (userId, templateData) => {
       .select()
       .single();
 
-    if (error) {
-      console.error('Supabase error saving template:', error);
-      throw error;
-    }
-    
-    console.log('✅ Template saved to Supabase:', {
-      id: data?.id,
-      htmlContentLength: data?.html_content?.length,
-      htmlContentPreview: data?.html_content?.substring(0, 100),
-      webhook_url: data?.webhook_url,
-      webhook_urlType: typeof data?.webhook_url,
-      webhook_urlLength: data?.webhook_url?.length,
-      webhook_urlTrimmed: data?.webhook_url?.trim(),
-      hasWebhook: !!(data?.webhook_url && data?.webhook_url.trim()),
-      fullData: data // Log full data to see everything
-    });
+    if (error) throw error;
     
     return data;
   } catch (error) {
@@ -562,11 +553,6 @@ export const saveEmailTemplate = async (userId, templateData) => {
 // Get email template
 export const getEmailTemplate = async (userId, templateType) => {
   try {
-    console.log('Fetching email template from Supabase:', { userId, templateType });
-    
-    // Use RPC or direct query - RLS should allow if driver has assigned routes
-    // But if RLS blocks, we need to use service role or bypass RLS
-    // For now, try direct query - RLS policy should allow if driver has routes assigned
     const { data, error } = await supabase
       .from('email_templates')
       .select('*')
@@ -574,45 +560,7 @@ export const getEmailTemplate = async (userId, templateType) => {
       .eq('template_type', templateType)
       .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') {
-      console.error('Supabase error fetching template:', error);
-      throw error;
-    }
-    
-    if (data) {
-      console.log('📥 Template fetched from Supabase:', {
-        id: data.id,
-        htmlContentLength: data.html_content?.length,
-        htmlContentType: typeof data.html_content,
-        htmlContentPreview: data.html_content?.substring(0, 100),
-        webhook_url: data.webhook_url,
-        webhook_urlType: typeof data.webhook_url,
-        webhook_urlLength: data.webhook_url?.length,
-        webhook_urlTrimmed: data.webhook_url?.trim(),
-        hasWebhook: !!(data.webhook_url && data.webhook_url.trim()),
-        fullData: data // Log full data to see everything
-      });
-    } else {
-      console.log('❌ No template found in Supabase for:', { userId, templateType });
-      // Try to see if there are any templates for this user
-      const { data: allTemplates, error: allError } = await supabase
-        .from('email_templates')
-        .select('template_type, webhook_url, user_id')
-        .eq('user_id', userId);
-      
-      if (!allError && allTemplates) {
-        console.log('📋 Available templates for this user:', allTemplates);
-        console.log('📋 Looking for template type:', templateType);
-        const matchingTemplate = allTemplates.find(t => t.template_type === templateType);
-        if (matchingTemplate) {
-          console.log('✅ Found matching template in list:', matchingTemplate);
-        } else {
-          console.log('❌ No matching template found in list');
-        }
-      } else if (allError) {
-        console.error('❌ Error fetching all templates:', allError);
-      }
-    }
+    if (error && error.code !== 'PGRST116') throw error;
     
     return data || null;
   } catch (error) {
@@ -816,7 +764,6 @@ export const getRouteStopTimestamps = async (routeId) => {
 
 // Send registration webhook to Zapier
 export const sendRegistrationWebhook = async (userData) => {
-  console.log('sendRegistrationWebhook called with:', userData);
   const REGISTRATION_WEBHOOK_URL = 'https://hooks.zapier.com/hooks/catch/20451847/ua2iy39/';
   
   if (!userData) {
@@ -827,12 +774,6 @@ export const sendRegistrationWebhook = async (userData) => {
   try {
     const API_BASE_URL = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8001');
     
-    console.log('Sending registration webhook via backend API:', {
-      API_BASE_URL,
-      webhookUrl: REGISTRATION_WEBHOOK_URL,
-      userData
-    });
-
     const payload = {
       webhookUrl: REGISTRATION_WEBHOOK_URL,
       templateType: 'user-registered',
@@ -849,8 +790,6 @@ export const sendRegistrationWebhook = async (userData) => {
         }
     };
 
-    console.log('Webhook payload:', JSON.stringify(payload, null, 2));
-
     const response = await fetch(`${API_BASE_URL}/api/send-webhook`, {
       method: 'POST',
       headers: {
@@ -859,23 +798,11 @@ export const sendRegistrationWebhook = async (userData) => {
       body: JSON.stringify(payload)
     });
 
-    console.log('Webhook response status:', response.status, response.statusText);
-
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.warn('Registration webhook response not OK:', response.status, response.statusText, errorData);
-      // Geen error gooien - webhook failures mogen registratie niet blokkeren
-    } else {
-      const responseData = await response.json().catch(() => ({}));
-      console.log('Registration webhook sent successfully:', responseData);
+      console.warn('Registration webhook failed:', response.status);
     }
   } catch (error) {
-    console.error('Error sending registration webhook:', error);
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    });
+    console.error('Error sending registration webhook:', error.message);
     // Geen error gooien - webhook failures mogen registratie niet blokkeren
   }
 };

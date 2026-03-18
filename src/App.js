@@ -28,6 +28,7 @@ import {
   getUserVehicles, 
   getUserOrders, 
   getUserRoutes,
+  getRoutesByDate,
   getUserProfile,
   getUserDrivers,
   saveVehicle, 
@@ -73,6 +74,7 @@ function AppContent() {
   const [movingStop, setMovingStop] = useState(null);
   const [availableRoutes, setAvailableRoutes] = useState([]);
   const [movingInProgress, setMovingInProgress] = useState(false);
+  const [mobileView, setMobileView] = useState('kaart');
   const hasRedirectedRef = useRef(false);
 
   // Redirect to /vandaag on page load/refresh (for authenticated non-driver users)
@@ -1028,34 +1030,20 @@ function AppContent() {
   const handleSelectRoute = async (date) => {
     setSelectedRouteDate(date);
     
-    // Try to load existing routes for this date if user is logged in
     if (currentUser) {
       try {
-        const userRoutes = await getUserRoutes(currentUser.id);
         const selectedDateStr = date instanceof Date 
           ? date.toISOString().split('T')[0] 
           : new Date(date).toISOString().split('T')[0];
         
-        const existingRoutes = userRoutes
-          .filter(r => {
-            if (!r.date) return false;
-            const routeDate = new Date(r.date).toISOString().split('T')[0];
-            return routeDate === selectedDateStr;
-          })
-          .sort((a, b) => {
-            // Sort by created_at to match the order in Routes table
-            const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
-            const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
-            return aTime - bTime;
-          });
+        // Only fetch routes for this specific date (not ALL routes)
+        const existingRoutes = await getRoutesByDate(currentUser.id, selectedDateStr);
 
         if (existingRoutes.length > 0) {
-          // Routes exist for this date, show choice modal
           setExistingRoutesForDate(existingRoutes);
           setPendingDate(date);
           setShowRouteChoiceModal(true);
         } else {
-          // No routes for this date, create new one
           await createNewRouteForDate(date, selectedDateStr);
         }
       } catch (error) {
@@ -1294,36 +1282,70 @@ function AppContent() {
                       />
                     </div>
                     
-                    <div className="map-container">
+                    <div className="mobile-route-logo">
+                      <img src="/logo.png" alt="RouteNu" />
+                    </div>
+
+                    <div className={`mobile-view-toggle-bar`}>
+                      <button
+                        className={`mobile-view-btn ${mobileView === 'kaart' ? 'active' : ''}`}
+                        onClick={() => setMobileView('kaart')}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+                          <line x1="8" y1="2" x2="8" y2="18"></line>
+                          <line x1="16" y1="6" x2="16" y2="22"></line>
+                        </svg>
+                        Kaart
+                      </button>
+                      <button
+                        className={`mobile-view-btn ${mobileView === 'overzicht' ? 'active' : ''}`}
+                        onClick={() => setMobileView('overzicht')}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="8" y1="6" x2="21" y2="6"></line>
+                          <line x1="8" y1="12" x2="21" y2="12"></line>
+                          <line x1="8" y1="18" x2="21" y2="18"></line>
+                          <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                          <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                          <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                        </svg>
+                        Overzicht
+                      </button>
+                    </div>
+
+                    <div className={`map-container ${mobileView === 'overzicht' ? 'mobile-hidden' : ''}`}>
                       <Map
                         mapboxToken={MAPBOX_PUBLIC_TOKEN}
                         stops={stops}
                         route={route}
                         startCoordinates={userProfile?.start_coordinates}
-                        center={[5.2913, 52.1326]} // Centrum van Nederland
+                        center={[5.2913, 52.1326]}
                         zoom={7}
                       />
                     </div>
                     
-                    <Timeline
-                        stops={stops}
-                        route={route}
-                        onRemoveStop={handleRemoveStop}
-                        onReorderStops={handleReorderStops}
-                        onReverseRoute={handleReverseRoute}
-                        startAddress={userProfile?.start_address}
-                        onEditStop={handleEditStop}
-                        onCalculateRoute={handleCalculateRoute}
-                        onOptimizeRoute={handleOptimizeRoute}
-                        isOptimizing={isOptimizing}
-                        departureTime={departureTime}
-                        onDepartureTimeChange={setDepartureTime}
-                        currentRouteId={currentRouteId}
-                        routeName={selectedRouteDate ? `Route ${new Date(selectedRouteDate).toLocaleDateString('nl-NL')}` : 'Route'}
-                        routeDate={selectedRouteDate}
-                        vehicles={vehicles}
-                        drivers={drivers}
-                      />
+                    <div className={`timeline-mobile-wrapper ${mobileView === 'kaart' ? 'mobile-hidden' : ''}`}>
+                      <Timeline
+                          stops={stops}
+                          route={route}
+                          onRemoveStop={handleRemoveStop}
+                          onReorderStops={handleReorderStops}
+                          onReverseRoute={handleReverseRoute}
+                          startAddress={userProfile?.start_address}
+                          onEditStop={handleEditStop}
+                          onCalculateRoute={handleCalculateRoute}
+                          onOptimizeRoute={handleOptimizeRoute}
+                          isOptimizing={isOptimizing}
+                          departureTime={departureTime}
+                          onDepartureTimeChange={setDepartureTime}
+                          currentRouteId={currentRouteId}
+                          routeName={selectedRouteDate ? `Route ${new Date(selectedRouteDate).toLocaleDateString('nl-NL')}` : 'Route'}
+                          routeDate={selectedRouteDate}
+                          vehicles={vehicles}
+                          drivers={drivers}
+                        />
+                    </div>
                     <AddStopModal
                       isOpen={isModalOpen}
                       onClose={() => {

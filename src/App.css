@@ -239,25 +239,129 @@
   position: relative;
 }
 
+/* Mobile route logo — hidden on desktop */
+.mobile-route-logo {
+  display: none;
+}
+
+/* Mobile view toggle bar — hidden on desktop */
+.mobile-view-toggle-bar {
+  display: none;
+}
+
+/* Timeline mobile wrapper — on desktop it behaves normally */
+.timeline-mobile-wrapper {
+  display: contents;
+}
+
 @media (max-width: 768px) {
   .content-wrapper {
     margin-left: 0;
     width: 100%;
     flex-direction: column;
-    padding-top: 70px; /* Space for mobile menu button */
+    padding-top: 70px;
   }
   
   .content-wrapper.full-width {
     padding-top: 70px;
   }
   
+  /* Hide sidebar completely on mobile when on route-aanmaken */
   .sidebar {
-    width: 100%;
-    max-height: 40vh;
+    display: none;
   }
-  
+
+  /* Logo top-right on mobile */
+  .mobile-route-logo {
+    display: block;
+    position: fixed;
+    top: 16px;
+    right: 12px;
+    z-index: 1001;
+  }
+
+  .mobile-route-logo img {
+    height: 36px;
+    width: auto;
+    display: block;
+  }
+
+  /* Toggle bar */
+  .mobile-view-toggle-bar {
+    display: flex;
+    position: fixed;
+    top: 78px;
+    right: 12px;
+    z-index: 1000;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    border: 1px solid #e0e0e0;
+  }
+
+  .mobile-view-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border: none;
+    background: white;
+    color: #666;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .mobile-view-btn.active {
+    background: #0CC0DF;
+    color: white;
+  }
+
+  .mobile-view-btn:not(.active):hover {
+    background: #f5f5f5;
+  }
+
+  .mobile-view-btn svg {
+    flex-shrink: 0;
+  }
+
+  /* Map full screen on mobile */
   .map-container {
-    height: 60vh;
+    position: fixed;
+    top: 70px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: auto;
+    z-index: 1;
+  }
+
+  /* Timeline wrapper on mobile */
+  .timeline-mobile-wrapper {
+    display: block;
+    position: fixed;
+    top: 70px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    background: white;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .timeline-mobile-wrapper .timeline-container {
+    width: 100%;
+    height: 100%;
+    box-shadow: none;
+  }
+
+  /* Hide elements based on mobile view */
+  .mobile-hidden {
+    display: none !important;
   }
 
   .page-logo-footer {
