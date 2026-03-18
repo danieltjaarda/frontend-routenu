@@ -214,6 +214,33 @@
   border-color: #c9cccf;
 }
 
+.summary-card.clickable {
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.summary-card.clickable:hover {
+  border-color: #0CC0DF;
+  box-shadow: 0 2px 8px rgba(12, 192, 223, 0.12);
+  transform: translateY(-1px);
+}
+
+.summary-card-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.summary-card-arrow {
+  color: #c9cccf;
+  transition: color 0.2s, transform 0.2s;
+}
+
+.summary-card.clickable:hover .summary-card-arrow {
+  color: #0CC0DF;
+  transform: translateX(2px);
+}
+
 .summary-card::before {
   display: none;
 }

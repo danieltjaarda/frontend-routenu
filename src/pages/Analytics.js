@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { getUserVehicles, getMonthlyCostsForMonth } from '../services/userData';
@@ -141,6 +142,7 @@ function ActiveRouteCard({ route }) {
 
 function Analytics() {
   const { currentUser } = useAuth();
+  const navigate = useNavigate();
   const [routes, setRoutes] = useState([]);
   const [allRoutes, setAllRoutes] = useState([]);
   const [activeRoutes, setActiveRoutes] = useState([]);
@@ -890,8 +892,13 @@ function Analytics() {
         {(routes.length > 0 || shopRepairs.length > 0) && (
           <div className="analytics-summary">
             {/* Revenue Card */}
-            <div className="summary-card">
-              <div className="summary-label">Totale Omzet</div>
+            <div className="summary-card clickable" onClick={() => navigate('/omzet')}>
+              <div className="summary-card-top-row">
+                <div className="summary-label">Totale Omzet</div>
+                <svg className="summary-card-arrow" width="18" height="18" viewBox="0 0 20 20" fill="none">
+                  <path d="M8 4L14 10L8 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
               <div className="summary-value">{formatCurrency(totals.totalRevenue)}</div>
               <div className="summary-period">{getPeriodLabel()}</div>
               <div className="stats-row">

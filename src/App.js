@@ -24,6 +24,7 @@ import Drivers from './pages/Drivers';
 import Checkout from './pages/Checkout';
 import PickedUpBikes from './pages/PickedUpBikes';
 import Inventory from './pages/Inventory';
+import RevenueDetail from './pages/RevenueDetail';
 import { 
   getUserVehicles, 
   getUserOrders, 
@@ -83,7 +84,7 @@ function AppContent() {
     if (hasRedirectedRef.current || !currentUser || isDriver) return;
     
     // Don't redirect on auth pages, checkout, profile pages, or if already on /vandaag
-    const excludedPages = ['/login', '/register', '/chauffeur-login', '/checkout', '/checkout/success', '/checkout/cancel', '/profiel', '/vandaag', '/route-aanmaken'];
+    const excludedPages = ['/login', '/register', '/chauffeur-login', '/checkout', '/checkout/success', '/checkout/cancel', '/profiel', '/vandaag', '/route-aanmaken', '/omzet'];
     if (excludedPages.includes(location.pathname)) {
       hasRedirectedRef.current = true;
       return;
@@ -1180,6 +1181,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <Analytics />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/omzet" 
+            element={
+              <ProtectedRoute>
+                <RevenueDetail />
               </ProtectedRoute>
             } 
           />
