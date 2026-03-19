@@ -1510,6 +1510,17 @@
   height: 100%;
 }
 
+.map-container-overview .map-container {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: auto !important;
+}
+
 .map-touch-overlay {
   position: absolute;
   top: 0;
