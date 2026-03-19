@@ -1724,6 +1724,7 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
   const [reviewSent, setReviewSent] = useState({});
   const [trackingSending, setTrackingSending] = useState({});
   const [trackingSent, setTrackingSent] = useState({});
+  const [mapInteractive, setMapInteractive] = useState(false);
 
   const handleSendTrackingForStop = async (stop, stopIndex) => {
     if (!stop.phone) return;
@@ -2067,6 +2068,11 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
             <div className="route-map-overview">
               <h3>Route op kaart</h3>
               <div className="map-container-overview">
+                <div
+                  className={`map-touch-overlay ${mapInteractive ? 'allow-map' : ''}`}
+                  onClick={() => setMapInteractive(true)}
+                  onTouchEnd={() => setMapInteractive(true)}
+                />
                 <Map
                   mapboxToken={MAPBOX_PUBLIC_TOKEN}
                   route={route.route_data?.geometry ? {
@@ -2082,6 +2088,16 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
                   zoom={route.stops.length > 1 ? 10 : 12}
                   completedStops={new Set(timestamps.filter(t => t.actual_arrival_time).map(t => t.stop_index))}
                 />
+                {!mapInteractive && (
+                  <div style={{
+                    position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)',
+                    background: 'rgba(0,0,0,0.6)', color: 'white', padding: '6px 14px',
+                    borderRadius: 20, fontSize: 12, fontWeight: 500, zIndex: 11, pointerEvents: 'none',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    Tik op de kaart om te interacteren
+                  </div>
+                )}
               </div>
             </div>
           )}
