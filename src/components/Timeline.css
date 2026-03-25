@@ -210,6 +210,29 @@
   height: 16px;
 }
 
+.remove-stop-btn {
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  background: transparent;
+  border: none;
+  transition: color 0.2s;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.remove-stop-btn:hover {
+  color: #dc2626;
+}
+
+.remove-stop-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
 .drag-handle {
   cursor: grab;
   padding: 4px;
