@@ -1335,6 +1335,16 @@ function AppContent() {
                     </div>
                     
                     <div className={`timeline-mobile-wrapper ${mobileView === 'kaart' ? 'mobile-hidden' : ''}`}>
+                      <button
+                        className="btn-add-stop-mobile"
+                        onClick={() => {
+                          setEditingStop(null);
+                          setIsModalOpen(true);
+                        }}
+                        disabled={!selectedDriver}
+                      >
+                        + Stop toevoegen
+                      </button>
                       <Timeline
                           stops={stops}
                           route={route}
