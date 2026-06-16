@@ -497,7 +497,7 @@ function AppContent() {
               routeDate: routeDatum,
               routeLink
             });
-            await fetch('https://apihier.com/api/webhook', {
+            await fetch('https://apihier.com/api/webhook/', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
