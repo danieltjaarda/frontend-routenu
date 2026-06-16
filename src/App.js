@@ -40,7 +40,6 @@ import {
   sendWebhook
 } from './services/userData';
 import { supabase } from './lib/supabase';
-import { DESKNA_FROM, getDesknaWelcomeEmail } from './utils/desknaBranding';
 import './App.css';
 
 // Public token voor Mapbox GL JS (kaart) - stel in via REACT_APP_MAPBOX_PUBLIC_TOKEN in .env
@@ -282,58 +281,9 @@ function AppContent() {
   }, [currentUser, isDriver]);
 
   // Functie om automatisch e-mail te verzenden wanneer een stop met e-mail wordt toegevoegd
-  const sendWelcomeEmail = async (stop, routeName, routeDate, routeId, useDeskna = false) => {
+  const sendWelcomeEmail = async (stop, routeName, routeDate, routeId) => {
     if (!currentUser || !stop.email || !stop.email.trim()) {
       return; // Geen e-mail als gebruiker niet ingelogd is of geen e-mail heeft
-    }
-
-    // Bij de Deskna-toggle: volledig Deskna-gebrande mail via het deskna.nl domein.
-    if (useDeskna) {
-      try {
-        const routeDateForDeskna = routeDate
-          ? new Date(routeDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
-          : 'binnenkort';
-        const routeLinkForDeskna = routeId ? `https://routenu.nl/route/${routeId}` : '#';
-        const { subject, html } = getDesknaWelcomeEmail({
-          stopName: stop.name,
-          stopAddress: stop.address,
-          routeName: routeName || 'Route',
-          routeDate: routeDateForDeskna,
-          routeLink: routeLinkForDeskna
-        });
-        const endpoint = `${API_BASE_URL}/api/send-email`;
-        console.log('📧 Deskna welcome email -> POST', endpoint, { from: DESKNA_FROM, to: stop.email.trim() });
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            from: DESKNA_FROM,
-            to: stop.email.trim(),
-            subject,
-            html,
-            useDeskna: true
-          })
-        });
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          console.error('Error sending Deskna welcome email:', result);
-          alert(
-            `Deskna e-mail NIET verstuurd (HTTP ${response.status}).\n` +
-            `Endpoint: ${endpoint}\n` +
-            `Fout: ${result.error || JSON.stringify(result) || 'onbekend'}`
-          );
-        } else {
-          console.log('✅ Deskna welcome email sent:', result);
-        }
-      } catch (error) {
-        console.error('Error sending Deskna welcome email:', error);
-        alert(
-          `Deskna e-mail kon niet worden verstuurd.\n` +
-          `Endpoint: ${API_BASE_URL}/api/send-email\n` +
-          `Fout: ${error.message}`
-        );
-      }
-      return;
     }
 
     try {
@@ -499,13 +449,13 @@ function AppContent() {
     
     // Save to Supabase if user is logged in
     if (currentUser) {
-      // Verstuur welkomst e-mail los van het opslaan, zodat een DB-fout
-      // (bijv. ontbrekende kolom) de mail niet blokkeert.
-      if (newStop.email && newStop.email.trim()) {
+      // Welkomst e-mail alleen voor niet-Deskna stops. Deskna-stops worden
+      // volledig afgehandeld via de webhook-ontvanger (zie webhook hieronder).
+      if (!newStop.useDeskna && newStop.email && newStop.email.trim()) {
         const routeNameForEmail = selectedRouteDate 
           ? `Route ${new Date(selectedRouteDate).toLocaleDateString('nl-NL')}` 
           : 'Route';
-        sendWelcomeEmail(newStop, routeNameForEmail, selectedRouteDate, currentRouteId, newStop.useDeskna);
+        sendWelcomeEmail(newStop, routeNameForEmail, selectedRouteDate, currentRouteId);
       }
 
       // Order opslaan (mag falen zonder de rest te blokkeren)
@@ -525,28 +475,32 @@ function AppContent() {
         console.error('Error auto-saving route:', error);
       }
 
-      // Webhook (Fatbikehulp WhatsApp) NIET versturen voor Deskna-stops:
-      // Deskna-klanten krijgen uitsluitend e-mail.
-      if (!newStop.useDeskna) {
-        try {
-          const routeDatum = selectedRouteDate 
-            ? new Date(selectedRouteDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
-            : 'nog niet bepaald';
-          await fetch('https://apihier.com/api/webhook/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              phone: newStop.phone || '',
-              message: `Beste klant, welkom bij Fatbikehulp! U bent aangemeld voor de route op ${routeDatum}. Bekijk deze pagina voor meer informatie: fatbikehulp.nl/informatie\n\nWilt u de tracking ontvangen? Vul dan dit formulier in: https://www.fatbikehulp.nl/klant-registratie\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`,
-              profile: 'default'
-            })
-          });
-          console.log('✅ Webhook sent successfully for new stop');
-        } catch (webhookError) {
-          console.error('❌ Error sending stop webhook:', webhookError);
+      // Webhook ALTIJD versturen bij het toevoegen van een stop.
+      // Bij Deskna-stops voegen we een herkenbare markering toe (deskna: true +
+      // profile: 'deskna') zodat de webhook-ontvanger hierop kan inspelen.
+      try {
+        const routeDatum = selectedRouteDate 
+          ? new Date(selectedRouteDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+          : 'nog niet bepaald';
+        const webhookPayload = {
+          phone: newStop.phone || '',
+          message: `Beste klant, welkom bij Fatbikehulp! U bent aangemeld voor de route op ${routeDatum}. Bekijk deze pagina voor meer informatie: fatbikehulp.nl/informatie\n\nWilt u de tracking ontvangen? Vul dan dit formulier in: https://www.fatbikehulp.nl/klant-registratie\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`,
+          profile: newStop.useDeskna ? 'deskna' : 'default'
+        };
+        // Speciale Deskna-tag zodat de ontvanger Deskna-stops apart kan afhandelen
+        if (newStop.useDeskna) {
+          webhookPayload.deskna = true;
         }
-      } else {
-        console.log('⏭️ Deskna-stop: webhook overgeslagen, alleen e-mail');
+        await fetch('https://apihier.com/api/webhook/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(webhookPayload)
+        });
+        console.log(newStop.useDeskna
+          ? '✅ Webhook sent for new stop (Deskna: deskna=true, profile=deskna)'
+          : '✅ Webhook sent successfully for new stop');
+      } catch (webhookError) {
+        console.error('❌ Error sending stop webhook:', webhookError);
       }
     } else {
       // Fallback: add to local state if not logged in
