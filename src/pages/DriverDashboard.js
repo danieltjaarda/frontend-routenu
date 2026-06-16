@@ -30,6 +30,44 @@ const sendReviewSMS = async (toPhoneNumber) => {
 };
 const FRONTEND_BASE_URL = process.env.REACT_APP_FRONTEND_URL || (process.env.NODE_ENV === 'production' ? 'https://app.routenu.nl' : window.location.origin);
 
+// Verstuur de "route gestart / live tracking" melding voor één stop.
+// Deskna-stops krijgen UITSLUITEND een Deskna-gebrande e-mail (geen WhatsApp);
+// overige stops krijgen de Fatbikehulp WhatsApp via apihier.com.
+const sendTrackingForStop = async (stop, { routeName, routeDatum, personalLink }) => {
+  if (stop.useDeskna) {
+    if (!stop.email || !stop.email.trim()) {
+      return; // Deskna-stop zonder e-mail: niets versturen
+    }
+    const { subject, html } = getDesknaRouteStartedEmail({
+      stopName: stop.name,
+      routeName: routeName || 'Route',
+      routeDate: routeDatum,
+      stopsText: '',
+      liveRouteLink: personalLink
+    });
+    const resp = await fetch(`${API_BASE_URL}/api/send-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: DESKNA_FROM, to: stop.email.trim(), subject, html, useDeskna: true })
+    });
+    if (!resp.ok) {
+      const errorData = await resp.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Deskna tracking e-mail mislukt');
+    }
+    return;
+  }
+
+  await fetch('https://apihier.com/api/webhook/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      phone: stop.phone || '',
+      message: `Goedemorgen! De route van ${routeDatum} is gestart. U kunt de live tracking volgen via deze link: ${personalLink}\n\nU wordt ook ruim 1 uur van tevoren gebeld.\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`,
+      profile: 'default'
+    })
+  });
+};
+
 function DriverDashboard() {
   const navigate = useNavigate();
   const { currentUser, logout } = useAuth();
@@ -299,18 +337,14 @@ function DriverDashboard() {
           : `${FRONTEND_BASE_URL}/route/${routeId}/${liveRouteToken}`;
 
         try {
-          await fetch('https://apihier.com/api/webhook/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              phone: stop.phone || '',
-              message: `Goedemorgen! De route van ${routeDatum} is gestart. U kunt de live tracking volgen via deze link: ${personalRouteLink}\n\nU wordt ook ruim 1 uur van tevoren gebeld.\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`,
-              profile: 'default'
-            })
+          await sendTrackingForStop(stop, {
+            routeName: route.name,
+            routeDatum,
+            personalLink: personalRouteLink
           });
-          console.log(`✅ Route gestart webhook sent for stop ${i + 1}: ${stop.name}`);
+          console.log(`✅ Route gestart melding sent for stop ${i + 1}: ${stop.name}${stop.useDeskna ? ' (Deskna e-mail)' : ''}`);
         } catch (err) {
-          console.error(`❌ Route gestart webhook failed for stop ${i + 1}: ${stop.name}`, err);
+          console.error(`❌ Route gestart melding failed for stop ${i + 1}: ${stop.name}`, err);
         }
       }
     } catch (error) {
@@ -785,6 +819,12 @@ function DriverDashboard() {
         // Send webhook for each stop with ONLY their specific data (no other stops)
         const webhookPromises = route.stops.map(async (stop, stopIndex) => {
           try {
+            // Deskna-stops krijgen alleen e-mail; sla de (Zapier) webhook over
+            if (stop.useDeskna) {
+              console.log(`⏭️ Deskna-stop ${stopIndex + 1}: route-gestart webhook overgeslagen (alleen e-mail)`);
+              return { stopIndex, identifier: stop.name || `Stop ${stopIndex + 1}`, success: true, skipped: true };
+            }
+
             const encodedEmail = stop.email ? encodeURIComponent(stop.email.trim().toLowerCase()) : null;
             const personalRouteLink = encodedEmail 
               ? `${FRONTEND_BASE_URL}/route/${route.id}/${liveRouteToken}/${encodedEmail}`
@@ -1215,14 +1255,10 @@ function DriverDashboard() {
                                 ? `${FRONTEND_BASE_URL}/route/${route.id}/${route.live_route_token}/${encodedEmail}`
                                 : `${FRONTEND_BASE_URL}/route/${route.id}/${route.live_route_token}`;
                               try {
-                                await fetch('https://apihier.com/api/webhook/', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    phone: stop.phone || '',
-                                    message: `Goedemorgen! De route van ${routeDatum} is gestart. U kunt de live tracking volgen via deze link: ${personalLink}\n\nU wordt ook ruim 1 uur van tevoren gebeld.\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`,
-                                    profile: 'default'
-                                  })
+                                await sendTrackingForStop(stop, {
+                                  routeName: route.name,
+                                  routeDatum,
+                                  personalLink
                                 });
                                 sent++;
                               } catch (err) {
@@ -1477,6 +1513,10 @@ function StopDetailsModal({ stop, stopIndex, totalStops, onSave, onClose, existi
   const handleSendReview = async () => {
     if (!stop.phone) {
       setReviewError('Geen telefoonnummer beschikbaar voor deze stop');
+      return;
+    }
+    if (stop.useDeskna) {
+      setReviewError('Deskna-klant: er wordt geen review-SMS verstuurd (alleen e-mail).');
       return;
     }
     setReviewSending(true);
@@ -1762,7 +1802,8 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
   const [mapInteractive, setMapInteractive] = useState(false);
 
   const handleSendTrackingForStop = async (stop, stopIndex) => {
-    if (!stop.phone) return;
+    // Deskna-stops sturen via e-mail; overige via telefoon (WhatsApp)
+    if (!stop.phone && !(stop.useDeskna && stop.email)) return;
     setTrackingSending(prev => ({ ...prev, [stopIndex]: true }));
     try {
       const routeDatum = route.date
@@ -1775,14 +1816,10 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
           ? `${FRONTEND_BASE_URL}/route/${route.id}/${route.live_route_token}`
           : `${FRONTEND_BASE_URL}/route/${route.id}`;
 
-      await fetch('https://apihier.com/api/webhook/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: stop.phone || '',
-          message: `Goedemorgen! De route van ${routeDatum} is gestart. U kunt de live tracking volgen via deze link: ${personalRouteLink}\n\nU wordt ook ruim 1 uur van tevoren gebeld.\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`,
-          profile: 'default'
-        })
+      await sendTrackingForStop(stop, {
+        routeName: route.name,
+        routeDatum,
+        personalLink: personalRouteLink
       });
       setTrackingSent(prev => ({ ...prev, [stopIndex]: true }));
     } catch (error) {
@@ -1793,8 +1830,14 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
     }
   };
 
-  const handleSendReviewForStop = async (phone, stopIndex) => {
+  const handleSendReviewForStop = async (stop, stopIndex) => {
+    const phone = stop?.phone;
     if (!phone) return;
+    // Deskna-klanten krijgen alleen e-mail, geen Fatbikehulp review-SMS
+    if (stop?.useDeskna) {
+      alert('Deskna-klant: er wordt geen review-SMS verstuurd (alleen e-mail).');
+      return;
+    }
     setReviewSending(prev => ({ ...prev, [stopIndex]: true }));
     try {
       await sendReviewSMS(phone);
@@ -2065,7 +2108,7 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
                           </div>
                         )}
                       </div>
-                      {stop.phone && (
+                      {(stop.phone || (stop.useDeskna && stop.email)) && (
                         <div className="review-sms-section" style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           {route.live_route_token && (
                             <button
@@ -2081,7 +2124,7 @@ function RouteOverviewModal({ route, timestamps, onClose }) {
                           <button
                             type="button"
                             className={`btn-review-sms ${reviewSent[index] ? 'btn-review-sent' : ''}`}
-                            onClick={() => handleSendReviewForStop(stop.phone, index)}
+                            onClick={() => handleSendReviewForStop(stop, index)}
                             disabled={reviewSending[index] || reviewSent[index]}
                             style={{ flex: 1 }}
                           >

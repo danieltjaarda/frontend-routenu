@@ -485,44 +485,54 @@ function AppContent() {
     
     // Save to Supabase if user is logged in
     if (currentUser) {
+      // Verstuur welkomst e-mail los van het opslaan, zodat een DB-fout
+      // (bijv. ontbrekende kolom) de mail niet blokkeert.
+      if (newStop.email && newStop.email.trim()) {
+        const routeNameForEmail = selectedRouteDate 
+          ? `Route ${new Date(selectedRouteDate).toLocaleDateString('nl-NL')}` 
+          : 'Route';
+        sendWelcomeEmail(newStop, routeNameForEmail, selectedRouteDate, currentRouteId, newStop.useDeskna);
+      }
+
+      // Order opslaan (mag falen zonder de rest te blokkeren)
       try {
         await saveOrder(currentUser.id, newStop);
         // Reload orders to get updated list
         const userOrders = await getUserOrders(currentUser.id);
         setAllOrders(userOrders);
-        
-        // Auto-save route with new stops
-        await autoSaveRoute(updatedStops, null, null);
-        
-        // Verstuur welkomst e-mail als stop een e-mailadres heeft
-        if (newStop.email && newStop.email.trim()) {
-          const routeNameForEmail = selectedRouteDate 
-            ? `Route ${new Date(selectedRouteDate).toLocaleDateString('nl-NL')}` 
-            : 'Route';
-          sendWelcomeEmail(newStop, routeNameForEmail, selectedRouteDate, currentRouteId, newStop.useDeskna);
-        }
-
       } catch (error) {
         console.error('Error saving order:', error);
       }
 
-      // Verstuur webhook ALTIJD bij het toevoegen van een stop (onafhankelijk van opslaan)
+      // Auto-save route met nieuwe stops (onafhankelijk van order opslaan)
       try {
-        const routeDatum = selectedRouteDate 
-          ? new Date(selectedRouteDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
-          : 'nog niet bepaald';
-        await fetch('https://apihier.com/api/webhook/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: newStop.phone || '',
-            message: `Beste klant, welkom bij Fatbikehulp! U bent aangemeld voor de route op ${routeDatum}. Bekijk deze pagina voor meer informatie: fatbikehulp.nl/informatie\n\nWilt u de tracking ontvangen? Vul dan dit formulier in: https://www.fatbikehulp.nl/klant-registratie\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`,
-            profile: 'default'
-          })
-        });
-        console.log('✅ Webhook sent successfully for new stop');
-      } catch (webhookError) {
-        console.error('❌ Error sending stop webhook:', webhookError);
+        await autoSaveRoute(updatedStops, null, null);
+      } catch (error) {
+        console.error('Error auto-saving route:', error);
+      }
+
+      // Webhook (Fatbikehulp WhatsApp) NIET versturen voor Deskna-stops:
+      // Deskna-klanten krijgen uitsluitend e-mail.
+      if (!newStop.useDeskna) {
+        try {
+          const routeDatum = selectedRouteDate 
+            ? new Date(selectedRouteDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+            : 'nog niet bepaald';
+          await fetch('https://apihier.com/api/webhook/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              phone: newStop.phone || '',
+              message: `Beste klant, welkom bij Fatbikehulp! U bent aangemeld voor de route op ${routeDatum}. Bekijk deze pagina voor meer informatie: fatbikehulp.nl/informatie\n\nWilt u de tracking ontvangen? Vul dan dit formulier in: https://www.fatbikehulp.nl/klant-registratie\n\nLet op: u kunt geen berichten sturen naar dit nummer. Dit nummer wordt alleen gebruikt voor routemeldingen.\n\nVoor vragen kunt u contact opnemen met onze klantenservice via WhatsApp: 085 060 4213\n\nMet vriendelijke groet,\nFatbikehulp`,
+              profile: 'default'
+            })
+          });
+          console.log('✅ Webhook sent successfully for new stop');
+        } catch (webhookError) {
+          console.error('❌ Error sending stop webhook:', webhookError);
+        }
+      } else {
+        console.log('⏭️ Deskna-stop: webhook overgeslagen, alleen e-mail');
       }
     } else {
       // Fallback: add to local state if not logged in
@@ -635,7 +645,7 @@ function AppContent() {
     
     // Verstuur webhook EERST (voordat auto-save kan falen)
     console.log('🗑️ Removing stop:', { id, removedStop, hasPhone: !!removedStop?.phone, phone: removedStop?.phone });
-    if (removedStop) {
+    if (removedStop && !removedStop.useDeskna) {
       const routeDatum = selectedRouteDate
         ? new Date(selectedRouteDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
         : 'nog niet bepaald';
@@ -650,6 +660,8 @@ function AppContent() {
       })
         .then(res => console.log('✅ Webhook sent for removed stop:', removedStop.name, 'status:', res.status))
         .catch(err => console.error('❌ Error sending webhook for removed stop:', err));
+    } else if (removedStop && removedStop.useDeskna) {
+      console.log('⏭️ Deskna-stop verwijderd: webhook overgeslagen (alleen e-mail)');
     } else {
       console.warn('⚠️ Could not find stop with id:', id, 'in stops:', stops.map(s => ({ id: s.id, name: s.name })));
     }
@@ -717,7 +729,7 @@ function AppContent() {
         ? new Date(targetRoute.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
         : 'een andere datum';
 
-      if (movingStop.phone) {
+      if (movingStop.phone && !movingStop.useDeskna) {
         fetch('https://apihier.com/api/webhook/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -767,7 +779,7 @@ function AppContent() {
 
       const targetDatum = new Date(dateStr).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
 
-      if (movingStop.phone) {
+      if (movingStop.phone && !movingStop.useDeskna) {
         fetch('https://apihier.com/api/webhook/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

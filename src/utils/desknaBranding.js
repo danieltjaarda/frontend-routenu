@@ -90,6 +90,30 @@ export const getDesknaWelcomeEmail = ({ stopName, stopAddress, routeName, routeD
   return { subject, html };
 };
 
+// Klanten-informeren / herinneringsmail (vóór de route, met verwachte tijd)
+export const getDesknaInformEmail = ({ stopName, routeName, routeDate, stopTimeRange, liveRouteLink }) => {
+  const name = stopName || 'klant';
+  const subject = `Deskna - U bent aangemeld voor ${routeName || 'de route'}`;
+  const bodyHtml = `
+    <h2 style="margin:0 0 16px 0;color:${DESKNA_DARK};font-size:22px;">Beste ${name},</h2>
+    <p style="margin:0 0 14px 0;">U bent aangemeld voor de route <strong>${routeName || 'Route'}</strong> op <strong>${routeDate || 'binnenkort'}</strong>.</p>
+    ${stopTimeRange ? `
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#faf7f4;border-radius:8px;border-left:4px solid ${DESKNA_ORANGE};margin:8px 0;">
+      <tr><td style="padding:14px 16px;">
+        <p style="margin:0 0 4px 0;font-weight:bold;color:${DESKNA_DARK};">Verwachte aankomsttijd</p>
+        <p style="margin:0;color:#444;">${stopTimeRange}</p>
+      </td></tr>
+    </table>` : ''}
+    <p style="margin:14px 0 0 0;">Meer informatie ontvangt u op de dag zelf van de route.</p>`;
+  const html = buildDesknaEmail({
+    previewText: `U bent aangemeld voor ${routeName || 'de route'}`,
+    bodyHtml,
+    buttonText: liveRouteLink && liveRouteLink !== '#' ? 'Bekijk route' : null,
+    buttonLink: liveRouteLink && liveRouteLink !== '#' ? liveRouteLink : null
+  });
+  return { subject, html };
+};
+
 // Route-gestart / live-tracking mail (wanneer de chauffeur de route start)
 export const getDesknaRouteStartedEmail = ({ stopName, routeName, routeDate, stopsText, liveRouteLink }) => {
   const name = stopName || 'klant';

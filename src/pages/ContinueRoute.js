@@ -43,8 +43,13 @@ function ContinueRoute() {
   const [kilometersDriven, setKilometersDriven] = useState('');
   const [isCompletingRoute, setIsCompletingRoute] = useState(false);
 
-  const handleSendReview = async (phone, stopIndex) => {
+  const handleSendReview = async (phone, stopIndex, stop = null) => {
     if (!phone) return;
+    // Deskna-klanten krijgen alleen e-mail, geen Fatbikehulp review-SMS
+    if (stop?.useDeskna) {
+      alert('Deskna-klant: er wordt geen review-SMS verstuurd (alleen e-mail).');
+      return;
+    }
     setReviewSending(true);
     try {
       await sendReviewSMS(phone);
@@ -393,7 +398,7 @@ function ContinueRoute() {
                 <button
                   type="button"
                   className={`btn-review-sms ${reviewSent[currentStopIndex] ? 'btn-review-sent' : ''}`}
-                  onClick={() => handleSendReview(currentStop.phone, currentStopIndex)}
+                  onClick={() => handleSendReview(currentStop.phone, currentStopIndex, currentStop)}
                   disabled={reviewSending || reviewSent[currentStopIndex]}
                 >
                   {reviewSending ? '⏳ Versturen...' : reviewSent[currentStopIndex] ? '✅ Review verstuurd!' : '⭐ Review versturen'}

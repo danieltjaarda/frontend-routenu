@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { getEmailTemplate, sendWebhook } from '../services/userData';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import { DESKNA_FROM, getDesknaInformEmail } from '../utils/desknaBranding';
 import './Timeline.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8001');
@@ -196,6 +197,12 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, onReverseRoute, 
 
     for (let i = 0; i < stops.length; i++) {
       const stop = stops[i];
+      // Deskna-stops krijgen geen Fatbikehulp WhatsApp; alleen de Deskna e-mail (hieronder)
+      if (stop.useDeskna) {
+        console.log(`⏭️ Deskna-stop ${i + 1}/${stops.length}: webhook overgeslagen (alleen e-mail)`);
+        setWebhookProgress({ current: i + 1, total: stops.length, failed: webhooksFailed });
+        continue;
+      }
       try {
         await fetch('https://apihier.com/api/webhook/', {
           method: 'POST',
@@ -431,7 +438,40 @@ function Timeline({ stops, route, onRemoveStop, onReorderStops, onReverseRoute, 
           const liveRouteLink = personalRouteLink; // Use personal link for liveRouteLink
           
           console.log('✓ Generated personal link for email', email, ':', personalRouteLink);
-          
+
+          // Deskna-stop: verstuur Deskna-gebrande mail via deskna.nl
+          if (stopForEmail && stopForEmail.useDeskna) {
+            const { subject: desknaSubject, html: desknaHtml } = getDesknaInformEmail({
+              stopName: stopForEmail.name,
+              routeName: routeNameForTemplate,
+              routeDate: routeDateForTemplate,
+              stopTimeRange,
+              liveRouteLink: personalRouteLink
+            });
+            try {
+              const desknaResp = await fetch(`${API_BASE_URL}/api/send-email`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  from: DESKNA_FROM,
+                  to: email.trim(),
+                  subject: desknaSubject,
+                  html: desknaHtml,
+                  useDeskna: true
+                })
+              });
+              const desknaData = await desknaResp.json().catch(() => ({}));
+              if (!desknaResp.ok) {
+                throw new Error(desknaData.error || 'Deskna e-mail mislukt');
+              }
+              console.log(`✅ Deskna inform e-mail sent to ${email}`);
+              return { email, success: true };
+            } catch (desknaErr) {
+              console.error(`❌ Deskna inform e-mail failed for ${email}:`, desknaErr);
+              return { email, success: false, error: desknaErr.message };
+            }
+          }
+
           // Make a copy of the HTML content to avoid mutating the original
           let htmlContent = String(savedTemplate.html_content);
           
