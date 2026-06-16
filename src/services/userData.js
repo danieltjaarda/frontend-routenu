@@ -167,6 +167,7 @@ export const saveOrder = async (userId, orderData) => {
       phone: orderData.phone || null,
       order_type: orderData.orderType || orderData.order_type || null,
       service_time: orderData.serviceTime || orderData.service_time || 5, // Service tijd in minuten
+      use_deskna: orderData.useDeskna || orderData.use_deskna || false,
       customer_info: orderData.customerInfo || orderData.customer_info || null
     };
 

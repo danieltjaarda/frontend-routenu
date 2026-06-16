@@ -1,6 +1,8 @@
 const { Resend } = require('resend');
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_iDLLL1LU_NKoUQ1R5oReCnu4AJawE8Sy3');
+// Aparte Resend-key voor het deskna.nl domein (gebruikt via de Deskna-toggle)
+const resendDeskna = new Resend(process.env.RESEND_API_KEY_DESKNA || 're_ZvgSrdLw_F5qDWU2ct8Bu9fjz7T9w6bcL');
 
 module.exports = async (req, res) => {
   // Enable CORS
@@ -22,7 +24,7 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const { from, to, subject, html } = req.body;
+    const { from, to, subject, html, useDeskna } = req.body;
 
     // Validation
     if (!from || !to || !subject || !html) {
@@ -31,8 +33,11 @@ module.exports = async (req, res) => {
       });
     }
 
+    // Kies de juiste Resend-client: deskna.nl bij actieve toggle, anders standaard
+    const emailClient = useDeskna ? resendDeskna : resend;
+
     // Send email via Resend
-    const data = await resend.emails.send({
+    const data = await emailClient.emails.send({
       from,
       to,
       subject,

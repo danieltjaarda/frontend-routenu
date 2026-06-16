@@ -9,7 +9,8 @@ function AddStopModal({ isOpen, onClose, onAddStop, editingStop = null, onUpdate
     email: '',
     phone: '',
     address: '',
-    orderType: 'Bezorgen' // default
+    orderType: 'Bezorgen', // default
+    useDeskna: false // standaard uit -> normale RouteNu mail
   });
   const [isSearching, setIsSearching] = useState(false);
   const [addressError, setAddressError] = useState('');
@@ -57,10 +58,10 @@ function AddStopModal({ isOpen, onClose, onAddStop, editingStop = null, onUpdate
   };
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }));
     if (name === 'address') {
       setAddressError('');
@@ -201,6 +202,7 @@ function AddStopModal({ isOpen, onClose, onAddStop, editingStop = null, onUpdate
           email: formData.email,
           phone: formData.phone,
           orderType: formData.orderType,
+          useDeskna: formData.useDeskna,
           customerInfo: {
             fullName: formData.fullName,
             email: formData.email,
@@ -222,7 +224,8 @@ function AddStopModal({ isOpen, onClose, onAddStop, editingStop = null, onUpdate
           email: '',
           phone: '',
           address: '',
-          orderType: 'Bezorgen'
+          orderType: 'Bezorgen',
+          useDeskna: false
         });
         setAddressError('');
         onClose();
@@ -245,7 +248,8 @@ function AddStopModal({ isOpen, onClose, onAddStop, editingStop = null, onUpdate
         email: editingStop.email || editingStop.customerInfo?.email || '',
         phone: editingStop.phone || editingStop.customerInfo?.phone || '',
         address: editingStop.address || '',
-        orderType: editingStop.orderType || 'Bezorgen'
+        orderType: editingStop.orderType || 'Bezorgen',
+        useDeskna: editingStop.useDeskna || false
       });
     } else if (isOpen && !editingStop) {
       // Reset form when opening for new stop
@@ -254,7 +258,8 @@ function AddStopModal({ isOpen, onClose, onAddStop, editingStop = null, onUpdate
         email: '',
         phone: '',
         address: '',
-        orderType: 'Bezorgen'
+        orderType: 'Bezorgen',
+        useDeskna: false
       });
     }
   }, [editingStop, isOpen]);
@@ -265,7 +270,8 @@ function AddStopModal({ isOpen, onClose, onAddStop, editingStop = null, onUpdate
       email: '',
       phone: '',
       address: '',
-      orderType: 'Bezorgen'
+      orderType: 'Bezorgen',
+      useDeskna: false
     });
     setAddressError('');
     setAddressSuggestions([]);
@@ -425,6 +431,30 @@ function AddStopModal({ isOpen, onClose, onAddStop, editingStop = null, onUpdate
                 <span>Zending</span>
               </label>
             </div>
+          </div>
+
+          <div className="form-section">
+            <h3>Verzendmethode aanmelding</h3>
+
+            <label className="deskna-toggle">
+              <div className="deskna-toggle-text">
+                <span className="deskna-toggle-title">Versturen via Deskna.nl</span>
+                <span className="deskna-toggle-subtitle">
+                  {formData.useDeskna
+                    ? 'Aanmelding wordt verstuurd vanaf het deskna.nl domein'
+                    : 'Standaard: aanmelding wordt verstuurd zoals nu'}
+                </span>
+              </div>
+              <span className="deskna-switch">
+                <input
+                  type="checkbox"
+                  name="useDeskna"
+                  checked={formData.useDeskna}
+                  onChange={handleInputChange}
+                />
+                <span className="deskna-slider"></span>
+              </span>
+            </label>
           </div>
 
           <div className="form-actions">

@@ -40,6 +40,7 @@ import {
   sendWebhook
 } from './services/userData';
 import { supabase } from './lib/supabase';
+import { DESKNA_FROM, getDesknaWelcomeEmail } from './utils/desknaBranding';
 import './App.css';
 
 // Public token voor Mapbox GL JS (kaart) - stel in via REACT_APP_MAPBOX_PUBLIC_TOKEN in .env
@@ -263,6 +264,7 @@ function AppContent() {
           ...order,
           // Map snake_case to camelCase for frontend compatibility
           orderType: order.order_type || order.orderType,
+          useDeskna: order.use_deskna || order.useDeskna || false,
           customerInfo: order.customer_info || order.customerInfo
         }));
         
@@ -280,9 +282,44 @@ function AppContent() {
   }, [currentUser, isDriver]);
 
   // Functie om automatisch e-mail te verzenden wanneer een stop met e-mail wordt toegevoegd
-  const sendWelcomeEmail = async (stop, routeName, routeDate, routeId) => {
+  const sendWelcomeEmail = async (stop, routeName, routeDate, routeId, useDeskna = false) => {
     if (!currentUser || !stop.email || !stop.email.trim()) {
       return; // Geen e-mail als gebruiker niet ingelogd is of geen e-mail heeft
+    }
+
+    // Bij de Deskna-toggle: volledig Deskna-gebrande mail via het deskna.nl domein.
+    if (useDeskna) {
+      try {
+        const routeDateForDeskna = routeDate
+          ? new Date(routeDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+          : 'binnenkort';
+        const routeLinkForDeskna = routeId ? `https://routenu.nl/route/${routeId}` : '#';
+        const { subject, html } = getDesknaWelcomeEmail({
+          stopName: stop.name,
+          stopAddress: stop.address,
+          routeName: routeName || 'Route',
+          routeDate: routeDateForDeskna,
+          routeLink: routeLinkForDeskna
+        });
+        const response = await fetch(`${API_BASE_URL}/api/send-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: DESKNA_FROM,
+            to: stop.email.trim(),
+            subject,
+            html,
+            useDeskna: true
+          })
+        });
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Error sending Deskna welcome email:', errorData);
+        }
+      } catch (error) {
+        console.error('Error sending Deskna welcome email:', error);
+      }
+      return;
     }
 
     try {
@@ -405,7 +442,7 @@ function AppContent() {
         .replace(/\$\{routeDate\}/g, routeDateForTemplate)
         .replace(/\$\{routeLink\}/g, routeLink);
 
-      // Verstuur e-mail
+      // Verstuur e-mail (standaard RouteNu-gedrag)
       const response = await fetch(`${API_BASE_URL}/api/send-email`, {
         method: 'POST',
         headers: {
@@ -438,6 +475,7 @@ function AppContent() {
       email: location.email || '',
       phone: location.phone || '',
       orderType: location.orderType || '',
+      useDeskna: location.useDeskna || false,
       customerInfo: location.customerInfo || null
     };
     
@@ -461,7 +499,7 @@ function AppContent() {
           const routeNameForEmail = selectedRouteDate 
             ? `Route ${new Date(selectedRouteDate).toLocaleDateString('nl-NL')}` 
             : 'Route';
-          sendWelcomeEmail(newStop, routeNameForEmail, selectedRouteDate, currentRouteId);
+          sendWelcomeEmail(newStop, routeNameForEmail, selectedRouteDate, currentRouteId, newStop.useDeskna);
         }
 
       } catch (error) {
@@ -528,6 +566,7 @@ function AppContent() {
             email: updatedData.email,
             phone: updatedData.phone,
             order_type: updatedData.orderType,
+            use_deskna: updatedData.useDeskna || false,
             customer_info: updatedData.customerInfo
           });
         }
@@ -1085,6 +1124,7 @@ function AppContent() {
       email: order.email,
       phone: order.phone,
       orderType: order.orderType,
+      useDeskna: order.useDeskna || false,
       customerInfo: order.customerInfo
     });
   };

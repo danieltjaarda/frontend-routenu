@@ -231,6 +231,86 @@
   background: #E0F7FA;
 }
 
+.deskna-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.deskna-toggle:hover {
+  border-color: #0CC0DF;
+  background: #f5f5f5;
+}
+
+.deskna-toggle:has(input:checked) {
+  border-color: #0CC0DF;
+  background: #E0F7FA;
+}
+
+.deskna-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.deskna-toggle-title {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.deskna-toggle-subtitle {
+  font-size: 12px;
+  color: #777;
+}
+
+.deskna-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 48px;
+  height: 28px;
+}
+
+.deskna-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.deskna-slider {
+  position: absolute;
+  inset: 0;
+  background: #ccc;
+  border-radius: 9999px;
+  transition: background 0.2s;
+}
+
+.deskna-slider::before {
+  content: '';
+  position: absolute;
+  height: 22px;
+  width: 22px;
+  left: 3px;
+  top: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.deskna-switch input:checked + .deskna-slider {
+  background: #0CC0DF;
+}
+
+.deskna-switch input:checked + .deskna-slider::before {
+  transform: translateX(20px);
+}
+
 .form-actions {
   display: flex;
   gap: 12px;

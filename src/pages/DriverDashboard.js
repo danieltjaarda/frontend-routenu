@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { getEmailTemplate, sendWebhook, getRouteStopTimestamps, recalculateArrivalTimes, getPickedUpBikesForDriver } from '../services/userData';
+import { DESKNA_FROM, getDesknaRouteStartedEmail } from '../utils/desknaBranding';
 import Map from '../components/Map';
 import './DriverDashboard.css';
 
@@ -589,8 +590,10 @@ function DriverDashboard() {
       // Get stop tokens from route (should be in data from handleStartRoute)
       const stopTokens = route.stop_tokens || {};
       
-      // Send emails to all customers with personal links (if any and if template exists)
-      const emailPromises = (customersWithEmail.length > 0 && emailTemplate && emailTemplate.html_content) ? customersWithEmail.map(async (stop) => {
+      // Send emails to all customers with personal links.
+      // Deskna-stops krijgen ALTIJD een Deskna-gebrande mail via het deskna.nl domein;
+      // overige stops alleen wanneer er een (custom of default) template is.
+      const emailPromises = (customersWithEmail.length > 0) ? customersWithEmail.map(async (stop) => {
         try {
           // Create personal link with email address
           const encodedEmail = encodeURIComponent(stop.email.trim().toLowerCase());
@@ -601,6 +604,38 @@ function DriverDashboard() {
           
           // Calculate stopsText for proper pluralization
           const stopsText = `${stopsCount} stop${stopsCount !== 1 ? 's' : ''}`;
+
+          // Deskna-stop: gebruik Deskna-branding + deskna.nl afzender/key
+          if (stop.useDeskna) {
+            const { subject: desknaSubject, html: desknaHtml } = getDesknaRouteStartedEmail({
+              stopName: stop.name,
+              routeName,
+              routeDate,
+              stopsText,
+              liveRouteLink: personalRouteLink
+            });
+            const desknaResponse = await fetch(`${API_BASE_URL}/api/send-email`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                from: DESKNA_FROM,
+                to: stop.email.trim(),
+                subject: desknaSubject,
+                html: desknaHtml,
+                useDeskna: true
+              })
+            });
+            if (!desknaResponse.ok) {
+              const errorData = await desknaResponse.json().catch(() => ({}));
+              throw new Error(errorData.error || 'E-mail verzenden mislukt');
+            }
+            return { email: stop.email, success: true };
+          }
+
+          // Geen Deskna en geen template -> niets versturen voor deze stop
+          if (!emailTemplate || !emailTemplate.html_content) {
+            return { email: stop.email, success: false, skipped: true };
+          }
           
           // Replace template variables with personalized link
           // First replace escaped placeholders (from default template)

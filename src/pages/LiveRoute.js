@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { recalculateArrivalTimes, getRouteStopTimestamps, getUserProfile } from '../services/userData';
 import { useAuth } from '../contexts/AuthContext';
 import Map from '../components/Map';
+import { DESKNA_LOGO_PATH } from '../utils/desknaBranding';
 import './LiveRoute.css';
 
 function LiveRoute() {
@@ -426,10 +427,18 @@ function LiveRoute() {
 
   const isRouteStarted = route.route_status === 'started';
 
+  // Deskna-branding: per klant bepaald op basis van de stop bij deze (persoonlijke) link
+  const targetStop = (targetStopIndex !== undefined && route.stops) ? route.stops[targetStopIndex] : null;
+  const isDeskna = !!(targetStop && targetStop.useDeskna);
+
   return (
-    <div className="live-route-page">
+    <div className={`live-route-page${isDeskna ? ' deskna' : ''}`}>
       <div className="live-route-header">
-        <img src="/fatbikehulplogo5.avif" alt="Fatbikehulp" className="live-route-logo" />
+        <img
+          src={isDeskna ? DESKNA_LOGO_PATH : '/fatbikehulplogo5.avif'}
+          alt={isDeskna ? 'Deskna' : 'Fatbikehulp'}
+          className="live-route-logo"
+        />
         <h1>{isRouteStarted ? 'Route Live Bekijken' : 'Route Informatie'}</h1>
         <p className="route-date">{routeDate}</p>
         {isRouteStarted && (

@@ -494,6 +494,51 @@
   }
 }
 
+/* ============================================
+   Deskna-branding (zwart / wit / oranje)
+   Actief wanneer de bekeken stop een Deskna-stop is.
+   ============================================ */
+.live-route-page.deskna .live-route-header {
+  border-top: 4px solid #FF6B00;
+}
+
+.live-route-page.deskna .live-route-header h1 {
+  color: #111111;
+}
+
+.live-route-page.deskna .live-route-logo {
+  max-width: 170px;
+}
+
+.live-route-page.deskna .status-badge {
+  background: #fff3e9;
+  color: #FF6B00;
+}
+
+.live-route-page.deskna .status-badge.started {
+  background: #fff3e9;
+  color: #FF6B00;
+}
+
+.live-route-page.deskna .stop-number {
+  background: #FF6B00;
+}
+
+.live-route-page.deskna .stop-card.completed .stop-number {
+  background: #111111;
+}
+
+.live-route-page.deskna .button,
+.live-route-page.deskna button.primary,
+.live-route-page.deskna .btn-primary {
+  background: #FF6B00;
+  color: #fff;
+}
+
+.live-route-page.deskna a {
+  color: #FF6B00;
+}
+
 
 
 

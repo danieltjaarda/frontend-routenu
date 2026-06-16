@@ -8,6 +8,8 @@ const { google } = require('googleapis');
 const app = express();
 const PORT = process.env.PORT || 8001;
 const RESEND_API_KEY = process.env.RESEND_API_KEY || 're_iDLLL1LU_NKoUQ1R5oReCnu4AJawE8Sy3';
+// Aparte Resend-key voor het deskna.nl domein (gebruikt via de Deskna-toggle)
+const RESEND_API_KEY_DESKNA = process.env.RESEND_API_KEY_DESKNA || 're_ZvgSrdLw_F5qDWU2ct8Bu9fjz7T9w6bcL';
 const MAPBOX_SECRET_TOKEN = process.env.MAPBOX_SECRET_TOKEN || 'sk.eyJ1IjoiZmF0YmlrZWh1bHAiLCJhIjoiY21qNnhqdXdjMDExcDNkczZrNmN6ZGtkcCJ9._qbrsDUZpEOR97cAI17-hA';
 
 // Google Ads Configuration
@@ -18,6 +20,7 @@ const GOOGLE_ADS_CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID;
 const GOOGLE_ADS_REFRESH_TOKEN = process.env.GOOGLE_ADS_REFRESH_TOKEN;
 
 const resend = new Resend(RESEND_API_KEY);
+const resendDeskna = new Resend(RESEND_API_KEY_DESKNA);
 
 // Middleware
 app.use(cors());
@@ -31,7 +34,7 @@ app.get('/health', (req, res) => {
 // Email sending endpoint
 app.post('/api/send-email', async (req, res) => {
   try {
-    const { from, to, subject, html } = req.body;
+    const { from, to, subject, html, useDeskna } = req.body;
 
     // Validation
     if (!from || !to || !subject || !html) {
@@ -41,17 +44,21 @@ app.post('/api/send-email', async (req, res) => {
       });
     }
 
+    // Kies de juiste Resend-client: deskna.nl bij actieve toggle, anders standaard
+    const emailClient = useDeskna ? resendDeskna : resend;
+
     // Debug logging
     console.log('Sending email:', {
       from,
       to,
       subject,
+      provider: useDeskna ? 'deskna' : 'default',
       htmlLength: html ? html.length : 0,
       htmlPreview: html ? html.substring(0, 100) : 'null'
     });
 
     // Send email via Resend
-    const data = await resend.emails.send({
+    const data = await emailClient.emails.send({
       from,
       to,
       subject,
