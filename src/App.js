@@ -301,7 +301,9 @@ function AppContent() {
           routeDate: routeDateForDeskna,
           routeLink: routeLinkForDeskna
         });
-        const response = await fetch(`${API_BASE_URL}/api/send-email`, {
+        const endpoint = `${API_BASE_URL}/api/send-email`;
+        console.log('📧 Deskna welcome email -> POST', endpoint, { from: DESKNA_FROM, to: stop.email.trim() });
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -312,12 +314,24 @@ function AppContent() {
             useDeskna: true
           })
         });
+        const result = await response.json().catch(() => ({}));
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error('Error sending Deskna welcome email:', errorData);
+          console.error('Error sending Deskna welcome email:', result);
+          alert(
+            `Deskna e-mail NIET verstuurd (HTTP ${response.status}).\n` +
+            `Endpoint: ${endpoint}\n` +
+            `Fout: ${result.error || JSON.stringify(result) || 'onbekend'}`
+          );
+        } else {
+          console.log('✅ Deskna welcome email sent:', result);
         }
       } catch (error) {
         console.error('Error sending Deskna welcome email:', error);
+        alert(
+          `Deskna e-mail kon niet worden verstuurd.\n` +
+          `Endpoint: ${API_BASE_URL}/api/send-email\n` +
+          `Fout: ${error.message}`
+        );
       }
       return;
     }
